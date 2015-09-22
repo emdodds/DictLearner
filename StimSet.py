@@ -8,20 +8,24 @@ import numpy as np
 
 class StimSet(object):
     def __init__(self, data, stimshape, batch_size=None):
+        """Notice that stimshape and the length of a datum may be different, since the
+        data may be represented in a reduced form."""
         self.data = data
         self.stimshape = stimshape
         self.stimsize = np.prod(stimshape)
+        self.datasize = data.shape[1]
+        self.nstims = data.shape[0]
         self.batch_size = batch_size
         
     def rand_stim(self, stimshape=None, batch_size=None):
         """Select random inputs. Return an array of batch_size columns,
         each of which is an input represented as a (column) vector. """
         batch_size = batch_size or self.batch_size
-        veclength = np.prod(self.data.shape[:-1])
+        veclength = np.prod(self.datasize)
         X = np.zeros((veclength, batch_size))
         for i in range(batch_size):
-            which = np.random.randint(self.data.shape[-1])
-            vec = self.data[..., which]
+            which = np.random.randint(self.nstims)
+            vec = self.data[which,...]
             if len(vec.shape) > 1:
                 vec = vec.reshape(self.stimsize)
             vec = vec - np.mean(vec)
@@ -45,22 +49,23 @@ class StimSet(object):
             m = int(np.sqrt(M))
             n = m
         
-        array = 0.5*np.ones((buf+n*(height+buf), buf+m*(length+buf)))
-        k = 0
-        
-        array = 0.5*np.ones((buf+n*(height+buf), buf+m*(length+buf)))
+        array = 0.5*np.ones((buf+n*(length+buf), buf+m*(height+buf)))
         k = 0
         
         # TODO: make this less ugly
-        # Right now it loops over every pixel in the array of STRFs.
-        for i in range(n):
-            for j in range(m):
+        # Right now it loops over every pixel in the array
+        for i in range(m):
+            for j in range(n):
                 if k < M:
                     normfactor = np.max(np.abs(stims[k,:]))
-                    for li in range(height):
-                        for lj in range(length):
-                            array[buf+(i)*(height+buf)+li, buf+(j)*(length+buf)+lj] =  \
-                            stims[k,lj+length*li]/normfactor
+                    hstart = buf+i*(height+buf)
+                    lstart = buf+j*(length+buf)
+                    thestim = stims[k,:].reshape(length,height)/normfactor
+                    array[lstart:lstart+length, hstart:hstart+height] = thestim
+#                    for li in range(height):
+#                        for lj in range(length):
+#                            array[buf+(i)*(height+buf)+li, buf+(j)*(length+buf)+lj] =  \
+#                            stims[k,lj+length*li]/normfactor
                 k = k+1
                 
         return array
@@ -82,7 +87,7 @@ class ImageSet(StimSet):
         length, height = stimshape or self.stimshape
         imsize = self.data.shape[0]
         # extract subimages at random from images array to make data array X
-        X = np.zeros((batch_size, length*height))
+        X = np.zeros((length*height, batch_size))
         for i in range(batch_size):
                 row = self.buffer + int(np.ceil((imsize-length-2*self.buffer)*np.random.rand()))
                 col = self.buffer + int(np.ceil((imsize-height-2*self.buffer)*np.random.rand()))

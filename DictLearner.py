@@ -51,13 +51,13 @@ class DictLearner(object):
         """The StimSet object handles the plotting of the current dictionary."""
         stimset = stimset or self.stims
         array = stimset.stimarray(self.Q)        
-        arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto')
+        arrayplot = plt.imshow(array.T,interpolation='nearest', cmap=cmap, aspect='auto')
         plt.gca().invert_yaxis()
         plt.colorbar()
         return arrayplot
         
     def rand_dict(self):
-        dataSize = np.prod(self.stims.data.shape[:-1])
+        dataSize = self.stims.datasize
         Q = np.random.randn(self.nunits, dataSize)
         normmatrix = np.diag(1/np.sqrt(np.sum(Q*Q,1))) 
         return np.dot(normmatrix,Q)

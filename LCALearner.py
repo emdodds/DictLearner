@@ -14,12 +14,14 @@ from DictLearner import DictLearner
 
 class LCALearner(DictLearner):
     
-    def __init__(self, data, nunits, learn_rate=.001, batch_size = None, 
-                 infrate=.01, niter=150, softthresh = False, datatype = "image",
+    def __init__(self, data, nunits, learn_rate=.01, theta = 0.022,
+                 batch_size = 100, infrate=.003, niter=300, min_thresh=0.4, adapt=0.95,
+                 softthresh = False, datatype = "image",
                  pca = None, stimshape = None):
-        self.batch_size = batch_size or data.shape[0]
+        self.batch_size = batch_size
         if datatype == "image":
-            self.stims = StimSet.ImageSet(data, self.batch_size, buffer=20, lpatch=16)
+            stimshape = stimshape or (16,16)
+            self.stims = StimSet.ImageSet(data, batch_size = self.batch_size, buffer=20, stimshape = stimshape)
         elif datatype == "spectro" and pca is not None:
             if stimshape == None:
                 raise Exception("When using PC representations, you need to provide the shape of the original stimuli.")
@@ -29,6 +31,8 @@ class LCALearner(DictLearner):
         self.nunits = nunits
         self.infrate = infrate
         self.niter = niter
+        self.min_thresh = min_thresh
+        self.adapt = adapt
         self.softthresh = softthresh
         super().__init__(learn_rate)
         
@@ -47,7 +51,8 @@ class LCALearner(DictLearner):
         
         # b[i,j] is overlap of stimulus i with dictionary element j
         b = X.T.dot(self.Q.T)
-        thresh = np.absolute(b).mean(1)
+        thresh = np.absolute(b).mean(1) # initial thresholds
+
         
         if infplot:
             errors = np.zeros(self.niter)
@@ -57,17 +62,16 @@ class LCALearner(DictLearner):
             ci = s.dot(c)
             u = self.infrate*(b-ci) + (1-self.infrate)*u
             if np.max(np.isnan(u)):
-                print ("Internal variable blew up at iteration " + str(kk) + "Current values:")
-                print (u)
-                raise ValueError
+                raise ValueError("Internal variable blew up at iteration " + str(kk))
             if self.softthresh:
                 s = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
             else:
                 s[:] = u
                 s[np.absolute(s) < thresh[:,np.newaxis]] = 0.   
-                
+            thresh[thresh>self.min_thresh] = self.adapt*thresh[thresh>self.min_thresh]
+            
             if infplot:
-                errors[kk] = np.mean((X - s.dot(self.Q))**2)
+                errors[kk] = np.mean((X.T - s.dot(self.Q))**2)
         
         if infplot:
             plt.figure(3)
@@ -78,7 +82,7 @@ class LCALearner(DictLearner):
     def test_inference(self, niter=None):
         temp = self.niter
         self.niter = niter or self.niter
-        X = self.stims.randStim()
+        X = self.stims.rand_stim()
         self.infer(X, infplot=True)
         self.niter = temp
                   
