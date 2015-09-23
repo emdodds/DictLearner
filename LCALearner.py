@@ -77,7 +77,7 @@ class LCALearner(DictLearner):
             plt.figure(3)
             plt.clf()
             plt.plot(errors)
-        return s
+        return s.T
             
     def test_inference(self, niter=None):
         temp = self.niter
@@ -86,5 +86,13 @@ class LCALearner(DictLearner):
         self.infer(X, infplot=True)
         self.niter = temp
                   
-            
+    def sort_dict(self, batch_size=None):
+        """Sorts the RFs in order by their activities on a batch. Default batch size
+        is 10 times self.batch_size."""
+        batch_size = batch_size or 10*self.batch_size
+        testX = self.stims.rand_stim(batch_size)
+        means = np.mean(self.infer(testX), axis=1)
+        sorter = np.argsort(means)
+        self.Q = self.Q[sorter]
+        return means[sorter]
             

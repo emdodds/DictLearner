@@ -27,8 +27,8 @@ class DictLearner(object):
         increase orthogonality between basis functions. This term is
         multiplied by the parameter theta.
         Returns the mean-squared error."""
-        R = data.T - np.dot(coeffs, self.Q)
-        self.Q = self.Q + self.eta*np.dot(coeffs.T,R)
+        R = data.T - np.dot(coeffs.T, self.Q)
+        self.Q = self.Q + self.eta*np.dot(coeffs,R)
         if theta != 0:
             self.Q = self.Q + theta*(self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
         return np.mean(R**2)
@@ -69,11 +69,11 @@ class DictLearner(object):
     def load_params(self, filename=None):
         filename = filename or self.picklefile
         with open(filename, 'rb') as f:
-            self.Q = pickle.load(f)
+            self.Q, self.errorhist = pickle.load(f)
         self.picklefile = filename
         
     def save_params(self, filename=None):
         filename = filename or self.picklefile
         with open(filename, 'wb') as f:
-            pickle.dump(self.Q, f)
+            pickle.dump([self.Q, self.errorhist], f)
             
