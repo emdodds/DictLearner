@@ -17,7 +17,7 @@ class LCALearner(DictLearner):
     def __init__(self, data, nunits, learn_rate=.01, theta = 0.022,
                  batch_size = 100, infrate=.003, niter=300, min_thresh=0.4, adapt=0.95,
                  softthresh = False, datatype = "image",
-                 pca = None, stimshape = None):
+                 pca = None, stimshape = None, paramfile = None):
         self.batch_size = batch_size
         if datatype == "image":
             stimshape = stimshape or (16,16)
@@ -34,7 +34,7 @@ class LCALearner(DictLearner):
         self.min_thresh = min_thresh
         self.adapt = adapt
         self.softthresh = softthresh
-        super().__init__(learn_rate)
+        super().__init__(learn_rate, paramfile = paramfile)
         
     
     def infer(self, X, infplot=False):

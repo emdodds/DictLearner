@@ -13,10 +13,11 @@ import matplotlib.pyplot as plt
 
 class DictLearner(object):
 
-    def __init__(self, eta):
+    def __init__(self, eta, paramfile=None):
         self.eta = eta # learning rate
         self.Q = self.rand_dict()
         self.errorhist = np.array([])
+        self.paramfile = paramfile
     
     def infer(self, data):
         raise NotImplementedError
@@ -33,19 +34,26 @@ class DictLearner(object):
             self.Q = self.Q + theta*(self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
         return np.mean(R**2)
             
-    def run(self, ntrials = 1000, batch_size = None):
+    def run(self, ntrials = 1000, batch_size = None, show=True):
         batch_size = batch_size or self.stims.batch_size        
-        errors = np.zeros(ntrials)
+        errors = np.zeros(min(ntrials,1000))
         for trial in range(ntrials):
             if trial % 50 == 0:
                 print (trial)
             X = self.stims.rand_stim(batch_size=batch_size)
             coeffs = self.infer(X)
             errors[trial] = self.learn(X, coeffs, theta=0)   
-        self.errorhist = np.concatenate((self.errorhist, errors))
-        plt.figure()
-        plt.plot(self.errorhist)
-        plt.show()            
+            if trial % 1000 == 0 or trial+1 == ntrials:
+                print ("Saving progress to " + self.paramfile)
+                self.errorhist = np.concatenate((self.errorhist, errors))
+                try: 
+                    self.save_params()
+                except ValueError as er:
+                    print ('Failed to save parameters. ', er)
+        if show:
+            plt.figure()
+            plt.plot(self.errorhist)
+            plt.show()            
     
     def show_dict(self, stimset=None, cmap='gray'):
         """The StimSet object handles the plotting of the current dictionary."""
@@ -67,13 +75,19 @@ class DictLearner(object):
         self.eta = factor*self.eta
         
     def load_params(self, filename=None):
-        filename = filename or self.picklefile
+        filename = filename or self.paramfile
+        if filename is None:
+            raise ValueError("You need to input a filename.")
+        self.paramfile = filename
         with open(filename, 'rb') as f:
             self.Q, self.errorhist = pickle.load(f)
         self.picklefile = filename
         
     def save_params(self, filename=None):
-        filename = filename or self.picklefile
+        filename = filename or self.paramfile
+        if filename is None:
+            raise ValueError("You need to input a filename.")
+        self.paramfile = filename        
         with open(filename, 'wb') as f:
             pickle.dump([self.Q, self.errorhist], f)
-            
+               
