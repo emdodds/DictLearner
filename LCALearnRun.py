@@ -10,8 +10,8 @@ import pickle
 import LCALearner
 import numpy as np
 import sys
-import pca
-sys.modules['pca.pca'] = pca #this is a workaround to get the pickled pca to load.  I think it basically tells python that pca.pca is an acceptable name for pca
+#import pca
+#sys.modules['pca.pca'] = pca #this is a workaround to get the pickled pca to load.  I think it basically tells python that pca.pca is an acceptable name for pca
 
 #images = scipy.io.loadmat('../SAILnet/PythonSAILnet/Data/Images.mat')["IMAGES"]
 #lca = LCALearner.LCALearner(images, nunits=300, learn_rate = .001, batch_size=100, infrate=.01, niter=100,
@@ -33,8 +33,8 @@ with open(picklefile,'rb') as f:
 spectros = np.load(datafile)
 lca = LCALearner.LCALearner(spectros, numunits, datatype="spectro", pca = pca,  stimshape=origshape, paramfile='dummy')
 
-lca.load_params(paramfile)
+#lca.load_params(paramfile)
 
-lca.run(ntrials = ntrials)
+#lca.run(ntrials = ntrials)
 
-lca.save_params(paramfile)
+#lca.save_params(paramfile)

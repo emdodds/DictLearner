@@ -13,16 +13,17 @@ import matplotlib.pyplot as plt
 
 class DictLearner(object):
 
-    def __init__(self, eta, paramfile=None):
+    def __init__(self, eta, paramfile=None, theta=0):
         self.eta = eta # learning rate
         self.Q = self.rand_dict()
         self.errorhist = np.array([])
         self.paramfile = paramfile
+        self.theta=theta
     
     def infer(self, data):
         raise NotImplementedError
     
-    def learn(self, data, coeffs, theta=0):
+    def learn(self, data, coeffs):
         """Adjust dictionary elements according to gradient descent on the 
         mean-squared error energy function, optionally with an extra term to
         increase orthogonality between basis functions. This term is
@@ -30,19 +31,19 @@ class DictLearner(object):
         Returns the mean-squared error."""
         R = data.T - np.dot(coeffs.T, self.Q)
         self.Q = self.Q + self.eta*np.dot(coeffs,R)
-        if theta != 0:
-            self.Q = self.Q + theta*(self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
+        if self.theta != 0:
+            self.Q = self.Q + self.theta*(self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
         return np.mean(R**2)
             
     def run(self, ntrials = 1000, batch_size = None, show=True):
-        batch_size = batch_size or self.stims.batch_size        
+        batch_size = batch_size or self.stims.batch_size
         errors = np.zeros(min(ntrials,1000))
         for trial in range(ntrials):
             if trial % 50 == 0:
                 print (trial)
             X = self.stims.rand_stim(batch_size=batch_size)
             coeffs = self.infer(X)
-            errors[trial] = self.learn(X, coeffs, theta=0)   
+            errors[trial % 1000] = self.learn(X, coeffs)   
             if trial % 1000 == 0 or trial+1 == ntrials:
                 print ("Saving progress to " + self.paramfile)
                 self.errorhist = np.concatenate((self.errorhist, errors))
@@ -73,6 +74,7 @@ class DictLearner(object):
     def adjust_rates(self, factor):
         """Multiply the learning rate by the given factor."""
         self.eta = factor*self.eta
+        self.theta = factor*self.theta
         
     def load_params(self, filename=None):
         filename = filename or self.paramfile

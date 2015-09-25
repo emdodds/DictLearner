@@ -34,7 +34,7 @@ class LCALearner(DictLearner):
         self.min_thresh = min_thresh
         self.adapt = adapt
         self.softthresh = softthresh
-        super().__init__(learn_rate, paramfile = paramfile)
+        super().__init__(learn_rate, paramfile = paramfile, theta=theta)
         
     
     def infer(self, X, infplot=False):
@@ -86,13 +86,15 @@ class LCALearner(DictLearner):
         self.infer(X, infplot=True)
         self.niter = temp
                   
-    def sort_dict(self, batch_size=None):
+    def sort_dict(self, batch_size=None, plot = False):
         """Sorts the RFs in order by their activities on a batch. Default batch size
-        is 10 times self.batch_size."""
+        is 10 times the stored batch size."""
         batch_size = batch_size or 10*self.batch_size
         testX = self.stims.rand_stim(batch_size)
-        means = np.mean(self.infer(testX), axis=1)
+        # the coefficients can be positive or negative; I use the RMS average to get a sense of how often they're used
+        means = np.sqrt(np.mean(self.infer(testX)**2, axis=1))
         sorter = np.argsort(means)
         self.Q = self.Q[sorter]
+        plt.plot(means[sorter])
         return means[sorter]
             
