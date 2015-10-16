@@ -23,7 +23,7 @@ class DictLearner(object):
     def infer(self, data):
         raise NotImplementedError
     
-    def learn(self, data, coeffs):
+    def learn(self, data, coeffs, normalize = True):
         """Adjust dictionary elements according to gradient descent on the 
         mean-squared error energy function, optionally with an extra term to
         increase orthogonality between basis functions. This term is
@@ -33,9 +33,13 @@ class DictLearner(object):
         self.Q = self.Q + self.eta*np.dot(coeffs,R)
         if self.theta != 0:
             self.Q = self.Q + self.theta*(self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
+        if normalize:
+            # force dictionary elements to be normalized
+            normmatrix = np.diag(1./np.sqrt(np.sum(self.Q*self.Q,1))) 
+            self.Q = normmatrix.dot(self.Q)
         return np.mean(R**2)
             
-    def run(self, ntrials = 1000, batch_size = None, show=True):
+    def run(self, ntrials = 1000, batch_size = None, show=True, rate_decay=None, normalize = True):
         batch_size = batch_size or self.stims.batch_size
         errors = np.zeros(min(ntrials,1000))
         for trial in range(ntrials):
@@ -43,7 +47,7 @@ class DictLearner(object):
                 print (trial)
             X = self.stims.rand_stim(batch_size=batch_size)
             coeffs = self.infer(X)
-            errors[trial % 1000] = self.learn(X, coeffs)   
+            errors[trial % 1000] = self.learn(X, coeffs, normalize)   
             if trial % 1000 == 0 or trial+1 == ntrials:
                 print ("Saving progress to " + self.paramfile)
                 self.errorhist = np.concatenate((self.errorhist, errors))
@@ -51,6 +55,8 @@ class DictLearner(object):
                     self.save_params()
                 except ValueError as er:
                     print ('Failed to save parameters. ', er)
+            if rate_decay is not None:
+                self.adjust_rates(rate_decay)
         if show:
             plt.figure()
             plt.plot(self.errorhist)
@@ -60,15 +66,15 @@ class DictLearner(object):
         """The StimSet object handles the plotting of the current dictionary."""
         stimset = stimset or self.stims
         array = stimset.stimarray(self.Q)        
-        arrayplot = plt.imshow(array.T,interpolation='nearest', cmap=cmap, aspect='auto')
+        arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto')
         plt.gca().invert_yaxis()
         plt.colorbar()
         return arrayplot
         
     def rand_dict(self):
-        dataSize = self.stims.datasize
-        Q = np.random.randn(self.nunits, dataSize)
-        normmatrix = np.diag(1/np.sqrt(np.sum(Q*Q,1))) 
+        datasize = self.stims.datasize
+        Q = np.random.randn(self.nunits, datasize)
+        normmatrix = np.diag(1./np.sqrt(np.sum(Q*Q,1))) 
         return np.dot(normmatrix,Q)
         
     def adjust_rates(self, factor):

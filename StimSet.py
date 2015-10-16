@@ -17,7 +17,7 @@ class StimSet(object):
         self.nstims = data.shape[0]
         self.batch_size = batch_size
         
-    def rand_stim(self, stimshape=None, batch_size=None):
+    def rand_stim(self, batch_size=None):
         """Select random inputs. Return an array of batch_size columns,
         each of which is an input represented as a (column) vector. """
         batch_size = batch_size or self.batch_size
@@ -52,8 +52,6 @@ class StimSet(object):
         array = 0.5*np.ones((buf+n*(length+buf), buf+m*(height+buf)))
         k = 0
         
-        # TODO: make this less ugly
-        # Right now it loops over every pixel in the array
         for i in range(m):
             for j in range(n):
                 if k < M:
@@ -68,7 +66,7 @@ class StimSet(object):
 #                            stims[k,lj+length*li]/normfactor
                 k = k+1
                 
-        return array
+        return array.T
         
 class ImageSet(StimSet):
     """Currently only compatible with square images (but arbitrary patches)."""
