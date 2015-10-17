@@ -16,7 +16,7 @@ class LCALearner(DictLearner):
     
     def __init__(self, data, nunits, learn_rate=None, theta = 0.022,
                  batch_size = 100, infrate=.003, #.0005 in Nicole's notes
-                 niter=150, min_thresh=0.4, adapt=0.95,
+                 niter=300, min_thresh=0.4, adapt=0.95,
                  softthresh = False, datatype = "image",
                  pca = None, stimshape = None, paramfile = None):
         self.batch_size = batch_size
@@ -54,7 +54,7 @@ class LCALearner(DictLearner):
         # b[i,j] is overlap of stimulus i with dictionary element j
         b = (self.Q.dot(X)).T
 
-        thresh = np.absolute(b).mean(0) # initial thresholds
+        thresh = np.absolute(b).mean(1) # initial thresholds
         
         if infplots:
             errors = np.zeros(self.niter)
@@ -70,7 +70,7 @@ class LCALearner(DictLearner):
                 s = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
             else:
                 s[:] = u
-                s[np.absolute(s) < thresh[np.newaxis,:]] = 0
+                s[np.absolute(s) < thresh[:,np.newaxis]] = 0
                 
             if infplots:
                 histories[:,kk] = u[0,:]
