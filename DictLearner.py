@@ -48,7 +48,7 @@ class DictLearner(object):
             X = self.stims.rand_stim(batch_size=batch_size)
             coeffs = self.infer(X)
             errors[trial % 1000] = self.learn(X, coeffs, normalize)   
-            if trial % 1000 == 0 or trial+1 == ntrials:
+            if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
                 print ("Saving progress to " + self.paramfile)
                 self.errorhist = np.concatenate((self.errorhist, errors))
                 try: 

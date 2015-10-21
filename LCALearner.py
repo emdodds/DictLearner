@@ -41,7 +41,8 @@ class LCALearner(DictLearner):
     
     def infer(self, X, infplots=False):
         """Infer sparse approximation to given data X using this LCALearner's 
-        current dictionary. Returns coefficients of sparse approximation."""
+        current dictionary. Returns coefficients of sparse approximation.
+        Optionally plot reconstruction error vs iteration number."""
         ndict = self.Q.shape[0]
         nstim = X.shape[-1]
         u = np.zeros((nstim, ndict))
@@ -54,27 +55,33 @@ class LCALearner(DictLearner):
         # b[i,j] is overlap of stimulus i with dictionary element j
         b = (self.Q.dot(X)).T
 
-        thresh = np.absolute(b).mean(1) # initial thresholds
+        # initialize threshold values, one for each stimulus, based on average response magnitude
+        thresh = np.absolute(b).mean(1) 
+        thresh = np.array([np.max([thr, self.min_thresh]) for thr in thresh])
         
         if infplots:
-            errors = np.zeros(self.niter)
+            errors = np.zeros((self.niter, nstim))
             histories = np.zeros((ndict, self.niter))
+            shistories = np.zeros((ndict, self.niter))
+            threshhist = np.zeros((nstim, self.niter))
         
         for kk in range(self.niter):
             # ci is the competition term in the dynamical equation
-            ci = s.dot(c)
-            u = self.infrate*(b-ci) + (1-self.infrate)*u
+            ci[:] = s.dot(c)
+            u[:] = self.infrate*(b-ci) + (1.-self.infrate)*u
             if np.max(np.isnan(u)):
                 raise ValueError("Internal variable blew up at iteration " + str(kk))
             if self.softthresh:
-                s = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
+                s[:] = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
             else:
                 s[:] = u
                 s[np.absolute(s) < thresh[:,np.newaxis]] = 0
                 
             if infplots:
                 histories[:,kk] = u[0,:]
-                errors[kk] = np.mean((X.T - s.dot(self.Q))**2)
+                shistories[:,kk] = s[0,:]
+                errors[kk,:] = np.mean((X.T - s.dot(self.Q))**2,axis=1)
+                threshhist[:,kk] = thresh
                 
             thresh[thresh>self.min_thresh] = self.adapt*thresh[thresh>self.min_thresh]
             
@@ -85,7 +92,9 @@ class LCALearner(DictLearner):
             plt.plot(errors)
             plt.figure(4)
             plt.clf()
-            plt.plot(histories.T)
+            hists = np.concatenate((histories,shistories),axis=0)
+            plt.plot(hists.T)
+            return s.T, errors, histories, shistories, threshhist
         return s.T
             
     def test_inference(self, niter=None):
