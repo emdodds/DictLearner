@@ -19,7 +19,7 @@ sys.modules['pca'] = pca.pca #this is a workaround to get the pickled pca to loa
 
 datafolder = '../audition/Data/'
 
-overcompleteness = 2
+overcompleteness = 0.5
 numinput = 200
 numunits = int(overcompleteness*numinput)
 picklefile = datafolder + 'spectropca2.pickle'
@@ -31,6 +31,10 @@ with open(picklefile,'rb') as f:
         pca, origshape, datamean, datastd = pickle.load(f)
 #spectros = scipy.io.loadmat("../SAILnet/PythonSAILnet/Data/processedspeech.mat")["processedspeech"]
 spectros = np.load(datafile)
+#center = np.mean(spectros)
+#spectros = spectros - center
+#scale = np.std(spectros)
+#spectros = spectros/scale
 lca = LCALearner.LCALearner(spectros, numunits, datatype="spectro", pca = pca,  stimshape=origshape, paramfile='dummy')
 
 #lca.load_params(paramfile)

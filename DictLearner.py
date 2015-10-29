@@ -47,7 +47,13 @@ class DictLearner(object):
                 print (trial)
             X = self.stims.rand_stim(batch_size=batch_size)
             coeffs = self.infer(X)
-            errors[trial % 1000] = self.learn(X, coeffs, normalize)   
+            thiserror = self.learn(X, coeffs, normalize)
+            errors[trial % 1000] = thiserror
+            
+            #temporary hack to stop LCA from killing itself
+            #if(thiserror>.85):
+            #    rate_decay = 1
+            
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
                 print ("Saving progress to " + self.paramfile)
                 self.errorhist = np.concatenate((self.errorhist, errors))

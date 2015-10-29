@@ -16,9 +16,32 @@ class LCALearner(DictLearner):
     
     def __init__(self, data, nunits, learn_rate=None, theta = 0.022,
                  batch_size = 100, infrate=.003, #.0005 in Nicole's notes
-                 niter=300, min_thresh=0.4, adapt=0.95,
+                 niter=300, min_thresh=0.4, adapt=0.95, tolerance = .01, max_iter=4,
                  softthresh = False, datatype = "image",
                  pca = None, stimshape = None, paramfile = None):
+        """
+        An LCALearner is a dictionary learner (DictLearner) that uses a Locally Competitive Algorithm (LCA) for inference.
+        By default the LCALearner optimizes for sparsity as measured by the L0 pseudo-norm of the activities of the units
+        (i.e. the usages of the dictionary elements). 
+        
+        Args:
+            data: data presented to LCALearner for estimating with LCA
+            nunits: number of units in thresholding circuit = number dictionary elements
+            learn_rate: rate for mean-squared error part of learning rule
+            theta: rate for orthogonality constraint part of learning rule
+            batch_size: number of data presented for inference per learning step
+            infrate: rate for evolving the dynamical equation in inference (size of each step)
+            niter: number of steps in inference (if tolerance is small, chunks of this many iterations are repeated until tolerance is satisfied)
+            min_thresh: thresholds are reduced during inference no lower than this value
+            adapt: factor by which thresholds are multipled after each inference step
+            tolerance: inference ceases after mean-squared error falls below tolerance
+            max_iter: maximum number of chunks of inference (each chunk having niter iterations)
+            softthresh: if True, optimize for L1-sparsity
+            datatype: image or spectro
+            pca: pca object for inverse-transforming data if used in PC representation
+            stimshape: original shape of data (e.g., before unrolling and PCA)
+            paramfile: a pickle file with dictionary and error history is stored here        
+        """
         self.batch_size = batch_size
         learn_rate = learn_rate or 1./(2*self.batch_size)
         if datatype == "image":
@@ -36,13 +59,21 @@ class LCALearner(DictLearner):
         self.min_thresh = min_thresh
         self.adapt = adapt
         self.softthresh = softthresh
+        self.tolerance = tolerance
+        self.max_iter = max_iter
         super().__init__(learn_rate, paramfile = paramfile, theta=theta)
         
     
-    def infer(self, X, infplots=False):
+    def infer(self, X, infplots=False, tolerance=None, max_iter = None):
         """Infer sparse approximation to given data X using this LCALearner's 
         current dictionary. Returns coefficients of sparse approximation.
-        Optionally plot reconstruction error vs iteration number."""
+        Optionally plot reconstruction error vs iteration number.
+        The instance variable niter determines for how many iterations to evaluate
+        the dynamical equations. Repeat this many iterations until the mean-squared error
+        is less than the given tolerance."""
+        tolerance = tolerance or self.tolerance
+        max_iter = max_iter or self.max_iter
+        
         ndict = self.Q.shape[0]
         nstim = X.shape[-1]
         u = np.zeros((nstim, ndict))
@@ -65,26 +96,32 @@ class LCALearner(DictLearner):
             shistories = np.zeros((ndict, self.niter))
             threshhist = np.zeros((nstim, self.niter))
         
-        for kk in range(self.niter):
-            # ci is the competition term in the dynamical equation
-            ci[:] = s.dot(c)
-            u[:] = self.infrate*(b-ci) + (1.-self.infrate)*u
-            if np.max(np.isnan(u)):
-                raise ValueError("Internal variable blew up at iteration " + str(kk))
-            if self.softthresh:
-                s[:] = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
-            else:
-                s[:] = u
-                s[np.absolute(s) < thresh[:,np.newaxis]] = 0
+        error = tolerance+1
+        outer_k = 0
+        while(error>tolerance and ((max_iter is None) or outer_k<max_iter)):
+            for kk in range(self.niter):
+                # ci is the competition term in the dynamical equation
+                ci[:] = s.dot(c)
+                u[:] = self.infrate*(b-ci) + (1.-self.infrate)*u
+                if np.max(np.isnan(u)):
+                    raise ValueError("Internal variable blew up at iteration " + str(kk))
+                if self.softthresh:
+                    s[:] = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
+                else:
+                    s[:] = u
+                    s[np.absolute(s) < thresh[:,np.newaxis]] = 0
+                    
+                if infplots:
+                    histories[:,kk] = u[0,:]
+                    shistories[:,kk] = s[0,:]
+                    errors[kk,:] = np.mean((X.T - s.dot(self.Q))**2,axis=1)
+                    threshhist[:,kk] = thresh
+                    
+                thresh = self.adapt*thresh
+                thresh[thresh<self.min_thresh] = self.min_thresh
                 
-            if infplots:
-                histories[:,kk] = u[0,:]
-                shistories[:,kk] = s[0,:]
-                errors[kk,:] = np.mean((X.T - s.dot(self.Q))**2,axis=1)
-                threshhist[:,kk] = thresh
-                
-            thresh[thresh>self.min_thresh] = self.adapt*thresh[thresh>self.min_thresh]
-            
+            error = np.mean((X.T - s.dot(self.Q))**2)
+            outer_k = outer_k+1
         
         if infplots:
             plt.figure(3)
@@ -120,6 +157,7 @@ class LCALearner(DictLearner):
         return means[sorter]
             
     def rand_dict(self):
+        """Return a random normalized dictionary."""
         datasize = self.stims.datasize
         Q = np.random.randn(self.nunits, datasize) - 0.5
         normmatrix = np.diag(1/np.sqrt(np.sum(Q*Q,1))) 

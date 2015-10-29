@@ -28,8 +28,6 @@ class StimSet(object):
             vec = self.data[which,...]
             if len(vec.shape) > 1:
                 vec = vec.reshape(self.stimsize)
-            vec = vec - np.mean(vec)
-            vec = vec/np.std(vec)
             X[:,i] = vec
         return X  
     
@@ -60,10 +58,7 @@ class StimSet(object):
                     lstart = buf+j*(length+buf)
                     thestim = stims[k,:].reshape(length,height)/normfactor
                     array[lstart:lstart+length, hstart:hstart+height] = thestim
-#                    for li in range(height):
-#                        for lj in range(length):
-#                            array[buf+(i)*(height+buf)+li, buf+(j)*(length+buf)+lj] =  \
-#                            stims[k,lj+length*li]/normfactor
+                    
                 k = k+1
                 
         return array.T
@@ -103,6 +98,9 @@ class PCvecSet(StimSet):
     
     def __init__(self, data, stimshape, pca, batch_size=None):
         self.pca = pca
+        # normalize each data point
+        data = data/(np.std(data,axis=1)[:,np.newaxis])        
+        
         super().__init__(data, stimshape, batch_size)
         
     def stimarray(self, stims):
