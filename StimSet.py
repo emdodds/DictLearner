@@ -99,7 +99,7 @@ class PCvecSet(StimSet):
     def __init__(self, data, stimshape, pca, batch_size=None):
         self.pca = pca
         # normalize each data point
-        data = data/(np.std(data,axis=1)[:,np.newaxis])        
+        #data = data/(np.std(data,axis=1)[:,np.newaxis])       # TODO: uncomment
         
         super().__init__(data, stimshape, batch_size)
         

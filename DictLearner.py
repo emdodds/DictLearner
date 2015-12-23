@@ -10,11 +10,12 @@ Includes gradient descent on MSE energy function as a default learning method.
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
+import easygui
 
 class DictLearner(object):
 
-    def __init__(self, eta, paramfile=None, theta=0):
-        self.eta = eta # learning rate
+    def __init__(self, learnrate, paramfile=None, theta=0):
+        self.learnrate = learnrate
         self.Q = self.rand_dict()
         self.errorhist = np.array([])
         self.paramfile = paramfile
@@ -30,7 +31,7 @@ class DictLearner(object):
         multiplied by the parameter theta.
         Returns the mean-squared error."""
         R = data.T - np.dot(coeffs.T, self.Q)
-        self.Q = self.Q + self.eta*np.dot(coeffs,R)
+        self.Q = self.Q + self.learnrate*np.dot(coeffs,R)
         if self.theta != 0:
             self.Q = self.Q + self.theta*(self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
         if normalize:
@@ -46,7 +47,7 @@ class DictLearner(object):
             if trial % 50 == 0:
                 print (trial)
             X = self.stims.rand_stim(batch_size=batch_size)
-            coeffs = self.infer(X)
+            coeffs,_,_ = self.infer(X)
             thiserror = self.learn(X, coeffs, normalize)
             errors[trial % 1000] = thiserror
             
@@ -68,7 +69,7 @@ class DictLearner(object):
             plt.plot(self.errorhist)
             plt.show()            
     
-    def show_dict(self, stimset=None, cmap='gray'):
+    def show_dict(self, stimset=None, cmap='jet'):
         """The StimSet object handles the plotting of the current dictionary."""
         stimset = stimset or self.stims
         array = stimset.stimarray(self.Q)        
@@ -85,19 +86,20 @@ class DictLearner(object):
         
     def adjust_rates(self, factor):
         """Multiply the learning rate by the given factor."""
-        self.eta = factor*self.eta
+        self.learnrate = factor*self.learnrate
         self.theta = factor*self.theta
         
     def load_params(self, filename=None):
-        filename = filename or self.paramfile
         if filename is None:
-            raise ValueError("You need to input a filename.")
+            filename = easygui.fileopenbox()
         self.paramfile = filename
         with open(filename, 'rb') as f:
             self.Q, self.errorhist = pickle.load(f)
         self.picklefile = filename
         
-    def save_params(self, filename=None):
+    def save_params(self, filename=None, dialog=False):
+        if dialog:
+            filename = easygui.fileopenbox()
         filename = filename or self.paramfile
         if filename is None:
             raise ValueError("You need to input a filename.")
