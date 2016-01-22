@@ -22,10 +22,8 @@ datafolder = '../audition/Data/'
 overcompleteness = 0.5
 numinput = 200
 numunits = int(overcompleteness*numinput)
-picklefile = datafolder + 'spectropca2.pickle'
-datafile = datafolder + 'processedspeech2.npy'
-paramfile = datafolder + 'lcaspectros'
-ntrials = 10**4
+picklefile = datafolder + 'spectropca12.pickle'
+datafile = datafolder + 'processedspeech12.npy'
 
 with open(picklefile,'rb') as f:
         pca, origshape, datamean, datastd = pickle.load(f)
@@ -36,6 +34,11 @@ spectros = np.load(datafile)
 #scale = np.std(spectros)
 #spectros = spectros/scale
 lca = LCALearner.LCALearner(spectros, numunits, datatype="spectro", pca = pca,  stimshape=origshape, paramfile='dummy')
+lca.tolerance = .01
+lca.max_iter = 4
+
+#lca.save_params('halfOC12_9newprep.pickle')
+lca.run(ntrials=50000,rate_decay=.9999)
 
 #lca.load_params(paramfile)
 

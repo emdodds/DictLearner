@@ -10,7 +10,6 @@ Includes gradient descent on MSE energy function as a default learning method.
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
-import easygui
 
 class DictLearner(object):
 
@@ -79,8 +78,7 @@ class DictLearner(object):
         return arrayplot
         
     def rand_dict(self):
-        datasize = self.stims.datasize
-        Q = np.random.randn(self.nunits, datasize)
+        Q = np.random.randn(self.nunits, self.stims.datasize)
         normmatrix = np.diag(1./np.sqrt(np.sum(Q*Q,1))) 
         return np.dot(normmatrix,Q)
         
@@ -91,15 +89,13 @@ class DictLearner(object):
         
     def load_params(self, filename=None):
         if filename is None:
-            filename = easygui.fileopenbox()
+            filename = self.paramfile
         self.paramfile = filename
         with open(filename, 'rb') as f:
             self.Q, self.errorhist = pickle.load(f)
         self.picklefile = filename
         
-    def save_params(self, filename=None, dialog=False):
-        if dialog:
-            filename = easygui.fileopenbox()
+    def save_params(self, filename=None):
         filename = filename or self.paramfile
         if filename is None:
             raise ValueError("You need to input a filename.")

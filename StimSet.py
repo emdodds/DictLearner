@@ -13,7 +13,6 @@ class StimSet(object):
         self.data = data
         self.stimshape = stimshape
         self.stimsize = np.prod(stimshape)
-        self.datasize = data.shape[1]
         self.nstims = data.shape[0]
         self.batch_size = batch_size
         
@@ -31,8 +30,9 @@ class StimSet(object):
             X[:,i] = vec
         return X  
     
-    def stimarray(self, stims, stimshape=None):
-        stimshape = stimshape or self.stimshape
+    @staticmethod
+    def _stimarray(stims, stimshape):
+        """Returns an array of the stimuli reshaped to 2d and tiled with single ."""    
         length, height = stimshape
         assert length*height == stims.shape[1]
         buf = 1 # buffer pixels between stimuli
@@ -62,12 +62,17 @@ class StimSet(object):
                 k = k+1
                 
         return array.T
+    
+    def stimarray(self, stims, stimshape=None):
+        stimshape = stimshape or self.stimshape
+        return StimSet._stimarray(stims, stimshape)
         
 class ImageSet(StimSet):
     """Currently only compatible with square images (but arbitrary patches)."""
     
     def __init__(self, data, stimshape=(16,16), batch_size=None, buffer=20):
         self.buffer = buffer
+        self.datasize = np.prod(stimshape) # size of a patch
         super().__init__(data, stimshape, batch_size)
     
     def rand_stim(self, stimshape=None, batch_size=None):
@@ -99,8 +104,8 @@ class PCvecSet(StimSet):
     def __init__(self, data, stimshape, pca, batch_size=None):
         self.pca = pca
         # normalize each data point
-        #data = data/(np.std(data,axis=1)[:,np.newaxis])       # TODO: uncomment
-        
+        # data = data/(np.std(data,axis=1)[:,np.newaxis])       # TODO: uncomment maybe?
+        self.datasize = data.shape[1]
         super().__init__(data, stimshape, batch_size)
         
     def stimarray(self, stims):
