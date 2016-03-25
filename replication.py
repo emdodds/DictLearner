@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Aug 21 15:32:36 2015
+Created on Thu Mar 24 16:31:30 2016
 
 @author: Eric
 """
@@ -13,11 +13,7 @@ import sys
 import pca.pca
 sys.modules['pca'] = pca.pca #this is a workaround to get the pickled pca to load.  I think it basically tells python that pca.pca is an acceptable name for pca
 
-#images = scipy.io.loadmat('../SAILnet/PythonSAILnet/Data/Images.mat')["IMAGES"]
-#lca = LCALearner.LCALearner(images, nunits=300, learn_rate = .001, batch_size=100, infrate=.01, niter=100,
-#                            min_thresh = 0.8, adapt=.98)
-
-datafolder = ''#/audition/Data/'
+datafolder = '../audition/Nicole Code/'#'../audition/Data/'
 
 overcompleteness = 4
 numinput = 200
@@ -34,7 +30,7 @@ numunits = int(overcompleteness*numinput)
 #scale = np.std(spectros)
 #spectros = spectros/scale
 
-stuff = io.loadmat('../audition/Nicole Code/PCAmatricesnew.mat')
+stuff = io.loadmat(datafolder+'PCAmatricesold.mat')
 mypca = pca.pca.PCA(dim=200,whiten=True)
 mypca.eVectors = stuff['E'].reshape((25,256,200))[:,::-1,:].reshape((6400,200)).T # flip the PC spectrograms upside down
 mypca.sValues = np.sqrt(np.diag(np.abs(stuff['D1'])))
@@ -43,12 +39,17 @@ mypca.mean_vec = np.zeros(6400)
 mypca.ready=True
 origshape = (25,256)
 
-spectros = io.loadmat('../audition/Nicole Code/dMatPCAnew.mat')['dMatPCA'].T
+spectros = io.loadmat(datafolder+'dMatPCAold.mat')['dMatPCA'].T
 
 lca = LCALearner.LCALearner(spectros, numunits, datatype="spectro", pca = mypca,  stimshape=origshape, paramfile='dummy')
 
 lca.tolerance = .01
 lca.max_iter = 4
+
+lambdas = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4]
+
+
+lca.Q = lca.rand_dict()
 
 #lca.min_thresh = .6
 #lca.save_params('halfOC_alt.pickle')

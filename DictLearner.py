@@ -30,9 +30,13 @@ class DictLearner(object):
         multiplied by the parameter theta.
         Returns the mean-squared error."""
         R = data.T - np.dot(coeffs.T, self.Q)
-        self.Q = self.Q + self.learnrate*np.dot(coeffs,R)
+        dQ = self.learnrate*np.dot(coeffs,R)
         if self.theta != 0:
-            self.Q = self.Q + self.theta*(self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
+            thetaterm = (self.Q.T - np.dot(self.Q.T,np.dot(self.Q,self.Q.T)))
+            dQ = dQ + self.theta*thetaterm.T
+            print(np.linalg.norm(thetaterm))
+            print(np.linalg.norm(dQ))
+        self.Q = self.Q + dQ
         if normalize:
             # force dictionary elements to be normalized
             normmatrix = np.diag(1./np.sqrt(np.sum(self.Q*self.Q,1))) 
@@ -68,19 +72,24 @@ class DictLearner(object):
             plt.plot(self.errorhist)
             plt.show()            
     
-    def show_dict(self, stimset=None, cmap='jet'):
+    def show_dict(self, stimset=None, cmap='jet', subset=None):
         """The StimSet object handles the plotting of the current dictionary."""
         stimset = stimset or self.stims
-        array = stimset.stimarray(self.Q)        
+        if subset is not None:
+            indices = np.random.choice(self.Q.shape[0], subset)
+            Qs = self.Q[np.sort(indices)]
+        else:
+            Qs = self.Q
+        array = stimset.stimarray(Qs)        
         arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto')
+        plt.axis('off')
         plt.gca().invert_yaxis()
         plt.colorbar()
         return arrayplot
         
     def rand_dict(self):
         Q = np.random.randn(self.nunits, self.stims.datasize)
-        normmatrix = np.diag(1./np.sqrt(np.sum(Q*Q,1))) 
-        return np.dot(normmatrix,Q)
+        return (np.diag(1/np.sqrt(np.sum(Q**2,1)))).dot(Q)
         
     def adjust_rates(self, factor):
         """Multiply the learning rate by the given factor."""

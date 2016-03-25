@@ -71,6 +71,20 @@ class LCALearner(DictLearner):
         self.gpu = gpu
         super().__init__(learnrate, paramfile = paramfile, theta=theta)
         
+    def show_oriented_dict(self, batch_size='all', *args):
+        """Display tiled dictionary as in DictLearn.show_dict(), but with elements inverted
+        if their activities tend to be negative."""
+        if batch_size == 'all':
+            X = self.stims.data.T
+        else:
+            X = self.stims.random_stim(batch_size)
+        means = np.mean(self.infer(X)[0],axis=1)
+        toflip = means < 0
+        realQ = self.Q
+        self.Q[toflip] = -self.Q[toflip]
+        result = self.show_dict(args)
+        self.Q = realQ
+        return result
     
     def infer_cpu(self, X, infplots=False, tolerance=None, max_iter = None):
         """Infer sparse approximation to given data X using this LCALearner's 
@@ -166,13 +180,6 @@ class LCALearner(DictLearner):
         if plot:
             plt.plot(means[sorter])
         return means[sorter]
-            
-    def rand_dict(self):
-        """Return a random normalized dictionary."""
-        datasize = self.stims.datasize
-        Q = np.random.randn(self.nunits, datasize) - 0.5
-        normmatrix = np.diag(1/np.sqrt(np.sum(Q*Q,1))) 
-        return np.dot(normmatrix,Q)
         
     def adjust_rates(self, factor):
         """Multiply the learning rate by the given factor."""
