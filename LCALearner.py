@@ -164,7 +164,7 @@ class LCALearner(DictLearner):
         self.niter = temp
         return s
                   
-    def sort_dict(self, batch_size=None, plot = False, allstims = True):
+    def sort_dict(self, batch_size=None, plot = False, allstims = True, savestr=None):
         """Sorts the RFs in order by their usage on a batch. Default batch size
         is 10 times the stored batch size. Usage means 1 for each stimulus for
         which the element was used and 0 for the other stimuli, averaged over 
@@ -179,6 +179,11 @@ class LCALearner(DictLearner):
         self.Q = self.Q[sorter]
         if plot:
             plt.plot(means[sorter])
+            plt.title('L0 Usage')
+            plt.xlabel('Dictionary index')
+            plt.ylabel('Fraction of stimuli')
+            if savestr is not None:
+                plt.savefig(savestr,format='png')
         return means[sorter]
         
     def adjust_rates(self, factor):

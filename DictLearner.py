@@ -34,8 +34,6 @@ class DictLearner(object):
         if self.theta != 0:
             thetaterm = (self.Q.T - np.dot(self.Q.T,np.dot(self.Q,self.Q.T)))
             dQ = dQ + self.theta*thetaterm.T
-            print(np.linalg.norm(thetaterm))
-            print(np.linalg.norm(dQ))
         self.Q = self.Q + dQ
         if normalize:
             # force dictionary elements to be normalized
@@ -74,6 +72,7 @@ class DictLearner(object):
     
     def show_dict(self, stimset=None, cmap='jet', subset=None):
         """The StimSet object handles the plotting of the current dictionary."""
+        # TODO: Reorder elements like Nicole's plots
         stimset = stimset or self.stims
         if subset is not None:
             indices = np.random.choice(self.Q.shape[0], subset)
