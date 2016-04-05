@@ -32,27 +32,32 @@ class StimSet(object):
     
     @staticmethod
     def _stimarray(stims, stimshape):
-        """Returns an array of the stimuli reshaped to 2d and tiled with single ."""    
+        """Returns an array of the stimuli reshaped to 2d and tiled."""    
         length, height = stimshape
         assert length*height == stims.shape[1]
         buf = 1 # buffer pixels between stimuli
-        M = stims.shape[0]
+        nstim = stims.shape[0]
         
         # n and m are respectively the numbers of rows and columns of stimuli in the array
-        if np.floor(np.sqrt(M))**2 != M:
-            n = int(np.ceil(np.sqrt(M/2.)))
-            m = int(np.ceil(M/n))
+        if length == height:
+            if np.floor(np.sqrt(nstim))**2 != nstim:
+                n = int(np.ceil(np.sqrt(nstim/2.)))
+                m = int(np.ceil(nstim/n))
+            else:
+                # M is a perfect square
+                m = int(np.sqrt(nstim))
+                n = m
         else:
-            # M is a perfect square
-            m = int(np.sqrt(M))
-            n = m
+            #if length != height, partly account for this so stimuli aren't so distorted. remove the extra square root to fully accommodate
+            n = int(np.sqrt(nstim*np.sqrt(height/length)))
+            m = int(np.ceil(nstim/n))
         
         array = 0.5*np.ones((buf+n*(length+buf), buf+m*(height+buf)))
         k = 0
         
         for i in range(m):
             for j in range(n):
-                if k < M:
+                if k < nstim:
                     normfactor = np.max(np.abs(stims[k,:]))
                     hstart = buf+i*(height+buf)
                     lstart = buf+j*(length+buf)
@@ -66,6 +71,14 @@ class StimSet(object):
     def stimarray(self, stims, stimshape=None):
         stimshape = stimshape or self.stimshape
         return StimSet._stimarray(stims, stimshape)
+        
+    def modspec(self, elem):
+        image = elem.reshape(self.stimshape)
+        fourier =  np.fft.rfft2(image)
+        mid = int(fourier.shape[0]/2)
+        power = np.abs(fourier)**2
+        avgmag = np.array([(power[ii] + power[-ii])/2 for ii in range(mid)])
+        return avgmag
         
 class ImageSet(StimSet):
     """Currently only compatible with square images (but arbitrary patches)."""
@@ -111,3 +124,6 @@ class PCvecSet(StimSet):
     def stimarray(self, stims):
         reconst = self.pca.inverse_transform(stims)
         return super().stimarray(reconst, self.stimshape)
+        
+    def modspec(self, elem):
+        return super().modspec(self.pca.inverse_transform(elem))

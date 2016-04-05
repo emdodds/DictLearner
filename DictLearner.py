@@ -10,6 +10,7 @@ Includes gradient descent on MSE energy function as a default learning method.
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
+from scipy import ndimage
 
 class DictLearner(object):
 
@@ -70,7 +71,7 @@ class DictLearner(object):
             plt.plot(self.errorhist)
             plt.show()            
     
-    def show_dict(self, stimset=None, cmap='jet', subset=None):
+    def show_dict(self, stimset=None, cmap='jet', subset=None, savestr=None):
         """The StimSet object handles the plotting of the current dictionary."""
         # TODO: Reorder elements like Nicole's plots
         stimset = stimset or self.stims
@@ -79,11 +80,13 @@ class DictLearner(object):
             Qs = self.Q[np.sort(indices)]
         else:
             Qs = self.Q
-        array = stimset.stimarray(Qs)        
-        arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto')
+        array = stimset.stimarray(Qs[::-1])
+        plt.figure()        
+        arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
         plt.axis('off')
-        plt.gca().invert_yaxis()
         plt.colorbar()
+        if savestr is not None:
+            plt.savefig(savestr, bbox_inches='tight')
         return arrayplot
         
     def rand_dict(self):
@@ -94,6 +97,27 @@ class DictLearner(object):
         """Multiply the learning rate by the given factor."""
         self.learnrate = factor*self.learnrate
         self.theta = factor*self.theta
+
+    def modulation_plot(self, usepeaks=False, **kwargs):
+        modcentroids = np.zeros((self.Q.shape[0],2))
+        for ii in range(self.Q.shape[0]):
+            modspec = self.stims.modspec(self.Q[ii])
+            if usepeaks:
+                modcentroids[ii,0] = np.argmax(np.mean(modspec,axis=1))
+                modcentroids[ii,1] = np.argmax(np.mean(modspec,axis=0))
+            else:
+                modcentroids[ii] = ndimage.measurements.center_of_mass(modspec)
+        plt.scatter(modcentroids[:,0], modcentroids[:,1])
+        plt.title('Center of mass of modulation power spectrum of each dictionary element')
+        try:
+            plt.xlabel(kwargs.xlabel)
+        except:
+            pass
+        try:
+            plt.ylabel(kwargs.ylabel)
+        except:
+            pass
+        
         
     def load_params(self, filename=None):
         if filename is None:

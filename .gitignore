@@ -60,3 +60,4 @@ target/
 *.pickle
 *.mat
 dummy*
+*.png
