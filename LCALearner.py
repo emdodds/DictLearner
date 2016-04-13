@@ -95,25 +95,32 @@ class LCALearner(DictLearner):
         Optionally plot reconstruction error vs iteration number.
         The instance variable niter determines for how many iterations to evaluate
         the dynamical equations. Repeat this many iterations until the mean-squared error
-        is less than the given tolerance."""
+        is less than the given tolerance or until max_iter repeats."""
         tolerance = tolerance or self.tolerance
         max_iter = max_iter or self.max_iter
-        
         ndict = self.Q.shape[0]
+        try:
+            # for the homeostatic version
+            minthr = self.lams
+        except AttributeError:
+            minthr = self.min_thresh*np.ones(ndict)
+               
         nstim = X.shape[-1]
         u = np.zeros((nstim, ndict))
         s = np.zeros_like(u)
         ci = np.zeros_like(u)
         
         # c is the overlap of dictionary elements with each other, minus identity (i.e., ignore self-overlap)
-        c = self.Q.dot(self.Q.T) - np.eye(ndict)
+        c = self.Q.dot(self.Q.T)
+        for i in range(c.shape[0]):
+            c[i,i] = 0
         
         # b[i,j] is overlap of stimulus i with dictionary element j
         b = (self.Q.dot(X)).T
 
         # initialize threshold values, one for each stimulus, based on average response magnitude
         thresh = np.absolute(b).mean(1) 
-        thresh = np.array([np.max([thr, self.min_thresh]) for thr in thresh])
+        thresh = np.array([np.max([thresh[ii], minthr[ii]]) for ii in range(ndict)])
         
         if infplots:
             errors = np.zeros((self.niter, nstim))
@@ -134,7 +141,7 @@ class LCALearner(DictLearner):
                     s[:] = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
                 else:
                     s[:] = u
-                    s[np.absolute(s) < thresh[:,np.newaxis]] = 0
+                    s[np.absolute(s) < thresh] = 0
                     
                 if infplots:
                     histories[:,kk] = u[0,:]
@@ -143,7 +150,8 @@ class LCALearner(DictLearner):
                     threshhist[:,kk] = thresh
                     
                 thresh = self.adapt*thresh
-                thresh[thresh<self.min_thresh] = self.min_thresh
+                togodown = thresh<minthr
+                thresh[togodown] = minthr[togodown]
                 
             error = np.mean((X.T - s.dot(self.Q))**2)
             outer_k = outer_k+1

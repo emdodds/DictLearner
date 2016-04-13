@@ -31,11 +31,11 @@ class DictLearner(object):
         multiplied by the parameter theta.
         Returns the mean-squared error."""
         R = data.T - np.dot(coeffs.T, self.Q)
-        dQ = self.learnrate*np.dot(coeffs,R)
+        self.Q = self.Q + self.learnrate*np.dot(coeffs,R)
         if self.theta != 0:
-            thetaterm = (self.Q.T - np.dot(self.Q.T,np.dot(self.Q,self.Q.T)))
-            dQ = dQ + self.theta*thetaterm.T
-        self.Q = self.Q + dQ
+            # Notice this is calculated using the Q after the mse learning rule
+            thetaterm = (self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
+            self.Q = self.Q + self.theta*thetaterm
         if normalize:
             # force dictionary elements to be normalized
             normmatrix = np.diag(1./np.sqrt(np.sum(self.Q*self.Q,1))) 
@@ -53,10 +53,6 @@ class DictLearner(object):
             thiserror = self.learn(X, coeffs, normalize)
             errors[trial % 1000] = thiserror
             
-            #temporary hack to stop LCA from killing itself
-            #if(thiserror>.85):
-            #    rate_decay = 1
-            
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
                 print ("Saving progress to " + self.paramfile)
                 self.errorhist = np.concatenate((self.errorhist, errors))
@@ -73,7 +69,6 @@ class DictLearner(object):
     
     def show_dict(self, stimset=None, cmap='jet', subset=None, savestr=None):
         """The StimSet object handles the plotting of the current dictionary."""
-        # TODO: Reorder elements like Nicole's plots
         stimset = stimset or self.stims
         if subset is not None:
             indices = np.random.choice(self.Q.shape[0], subset)
