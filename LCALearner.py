@@ -26,7 +26,7 @@ class LCALearner(DictLearner):
     def __init__(self, data, nunits, learnrate=None, theta = 0.022,
                  batch_size = 100, infrate=.003, #.0005 in Nicole's notes
                  niter=300, min_thresh=0.4, adapt=0.95, tolerance = .01, max_iter=4,
-                 softthresh = False, datatype = "image",
+                 softthresh = False, datatype = "image", moving_avg_rate=.001,
                  pca = None, stimshape = None, paramfile = None, gpu=False):
         """
         An LCALearner is a dictionary learner (DictLearner) that uses a Locally Competitive Algorithm (LCA) for inference.
@@ -72,9 +72,9 @@ class LCALearner(DictLearner):
         self.tolerance = tolerance
         self.max_iter = max_iter
         self.gpu = gpu
-        super().__init__(learnrate, paramfile = paramfile, theta=theta)
+        super().__init__(learnrate, paramfile = paramfile, theta=theta, moving_avg_rate=moving_avg_rate)
         
-    def show_oriented_dict(self, batch_size='all', *args):
+    def show_oriented_dict(self, batch_size='all', *args, **kwargs):
         """Display tiled dictionary as in DictLearn.show_dict(), but with elements inverted
         if their activities tend to be negative."""
         if batch_size == 'all':
@@ -85,7 +85,7 @@ class LCALearner(DictLearner):
         toflip = means < 0
         realQ = self.Q
         self.Q[toflip] = -self.Q[toflip]
-        result = self.show_dict(args)
+        result = self.show_dict(*args, **kwargs)
         self.Q = realQ
         return result
     
@@ -99,11 +99,6 @@ class LCALearner(DictLearner):
         tolerance = tolerance or self.tolerance
         max_iter = max_iter or self.max_iter
         ndict = self.Q.shape[0]
-        try:
-            # for the homeostatic version
-            minthr = self.lams
-        except AttributeError:
-            minthr = self.min_thresh*np.ones(ndict)
                
         nstim = X.shape[-1]
         u = np.zeros((nstim, ndict))
@@ -120,7 +115,7 @@ class LCALearner(DictLearner):
 
         # initialize threshold values, one for each stimulus, based on average response magnitude
         thresh = np.absolute(b).mean(1) 
-        thresh = np.array([np.max([thresh[ii], minthr[ii]]) for ii in range(ndict)])
+        thresh = np.array([np.max([th, self.min_thresh]) for th in thresh])
         
         if infplots:
             errors = np.zeros((self.niter, nstim))
@@ -141,7 +136,7 @@ class LCALearner(DictLearner):
                     s[:] = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
                 else:
                     s[:] = u
-                    s[np.absolute(s) < thresh] = 0
+                    s[np.absolute(s) < thresh[:,np.newaxis]] = 0
                     
                 if infplots:
                     histories[:,kk] = u[0,:]
@@ -150,8 +145,7 @@ class LCALearner(DictLearner):
                     threshhist[:,kk] = thresh
                     
                 thresh = self.adapt*thresh
-                togodown = thresh<minthr
-                thresh[togodown] = minthr[togodown]
+                thresh[thresh<self.min_thresh] = self.min_thresh
                 
             error = np.mean((X.T - s.dot(self.Q))**2)
             outer_k = outer_k+1
@@ -187,29 +181,51 @@ class LCALearner(DictLearner):
             testX = self.stims.rand_stim(batch_size)
         means = np.mean(self.infer(testX)[0] != 0, axis=1)
         sorter = np.argsort(means)
+        self.sort(means, sorter, plot, savestr)
+        return means[sorter]
+        
+    def fast_sort(self, L1=False, plot=False, savestr=None):
+        """Sorts RFs in order by moving average usage."""
+        if L1:
+            usages = self.L1acts
+        else:
+            usages = self.L0acts
+        sorter = np.argsort(usages)
+        self.sort(usages, sorter, plot, savestr)
+        return usages[sorter]
+    
+    def sort(self, usages, sorter, plot=False, savestr=None):
         self.Q = self.Q[sorter]
+        self.L0acts = self.L0acts[sorter]
+        self.L1acts = self.L1acts[sorter]
         if plot:
-            plt.plot(means[sorter])
+            plt.figure()
+            plt.plot(usages[sorter])
             plt.title('L0 Usage')
             plt.xlabel('Dictionary index')
             plt.ylabel('Fraction of stimuli')
             if savestr is not None:
-                plt.savefig(savestr,format='png')
-        return means[sorter]
+                plt.savefig(savestr,format='png', bbox_inches='tight')
         
     def adjust_rates(self, factor):
         """Multiply the learning rate by the given factor."""
         self.learnrate = factor*self.learnrate
-        #self.infrate = self.infrate*factor # TODO: this is bad, temporary
+        #self.infrate = self.infrate*factor # this is bad, but NC seems to have done it
         
     def load_params(self, filename=None):
+        """Loads the parameters that were saved. For older files when I saved less, loads what I saved then."""
         self.paramfile = filename
         try:
             with open(filename, 'rb') as f:
-                self.Q, params, self.errorhist = pickle.load(f)
+                self.Q, params, histories = pickle.load(f)                
             self.learnrate, self.theta, self.min_thresh, self.infrate, self.niter, self.adapt, self.max_iter, self.tolerance = params
+            try:
+                self.errorhist, self.L0acts, self.L1acts = histories
+            except ValueError:
+                print("Loading old file. Moving average activities not available.")
+                self.errorhist = histories
         except ValueError:
-            # this is so I can still load older files from when I saved less stuff
+            print("Loading very old file. Only dictionary and error history available.")
             with open(filename, 'rb') as f:
                 self.Q, self.errorhist = pickle.load(f)
         self.picklefile = filename
@@ -219,9 +235,11 @@ class LCALearner(DictLearner):
         if filename is None:
             raise ValueError("You need to input a filename.")
         self.paramfile = filename        
-        params = (self.learnrate, self.theta, self.min_thresh, self.infrate, self.niter, self.adapt, self.max_iter, self.tolerance)
+        params = (self.learnrate, self.theta, self.min_thresh, self.infrate, 
+                  self.niter, self.adapt, self.max_iter, self.tolerance)
+        histories = (self.errorhist,self.L0acts, self.L1acts)
         with open(filename, 'wb') as f:
-            pickle.dump([self.Q, params, self.errorhist], f)
+            pickle.dump([self.Q, params, histories], f)
         
     ### GPU implementation by Jesse Livezey, adapted by EMD
     try:
@@ -299,6 +317,11 @@ class LCALearner(DictLearner):
     def infer(self, X, infplots=False, tolerance=None, max_iter = None):
         if self.gpu:
             # right now there is no support for multiple blocks of iterations, stopping after error crosses threshold, or plots monitoring inference
-            return self.infer_gpu(X.T)
+            results= self.infer_gpu(X.T)
         else:
-            return self.infer_cpu(X, infplots, tolerance, max_iter)
+            results= self.infer_cpu(X, infplots, tolerance, max_iter)
+        acts = results[0]
+        self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
+        L0means = np.mean(acts != 0,axis=1)
+        self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
+        return results

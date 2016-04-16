@@ -14,12 +14,18 @@ from scipy import ndimage
 
 class DictLearner(object):
 
-    def __init__(self, learnrate, paramfile=None, theta=0):
+    def __init__(self, learnrate, paramfile=None, theta=0, moving_avg_rate=0.001):
         self.learnrate = learnrate
         self.Q = self.rand_dict()
         self.errorhist = np.array([])
         self.paramfile = paramfile
         self.theta=theta
+        self.L0hist = np.array([])
+        self.L1hist = np.array([])
+        nunits = self.Q.shape[0]
+        self.L0acts = np.zeros(nunits)
+        self.L1acts = np.zeros(nunits)
+        self.moving_avg_rate=moving_avg_rate
     
     def infer(self, data):
         raise NotImplementedError
@@ -45,6 +51,8 @@ class DictLearner(object):
     def run(self, ntrials = 1000, batch_size = None, show=True, rate_decay=None, normalize = True):
         batch_size = batch_size or self.stims.batch_size
         errors = np.zeros(min(ntrials,1000))
+        L0means = np.zeros_like(errors)
+        L1means = np.zeros_like(errors)
         for trial in range(ntrials):
             if trial % 50 == 0:
                 print (trial)
@@ -52,10 +60,14 @@ class DictLearner(object):
             coeffs,_,_ = self.infer(X)
             thiserror = self.learn(X, coeffs, normalize)
             errors[trial % 1000] = thiserror
+            L0means[trial % 1000] = np.mean(coeffs!=0)
+            L1means[trial % 1000] = np.mean(np.abs(coeffs))
             
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
                 print ("Saving progress to " + self.paramfile)
                 self.errorhist = np.concatenate((self.errorhist, errors))
+                self.L0hist = np.concatenate((self.L0hist, L0means))
+                self.L1hist = np.concatenate((self.L1hist, L1means))
                 try: 
                     self.save_params()
                 except ValueError as er:
