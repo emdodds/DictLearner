@@ -61,3 +61,4 @@ target/
 *.mat
 dummy*
 *.png
+*.ipynb

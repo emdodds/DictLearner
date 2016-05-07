@@ -29,6 +29,22 @@ class DictLearner(object):
     
     def infer(self, data):
         raise NotImplementedError
+        
+    def generate_model(self, acts):
+        """Reconstruct inputs using linear generative model."""
+        return np.dot(self.Q.T,acts)
+        
+    def compute_errors(self, acts, X):
+        """Given a batch of data and activities, compute the squared error between
+        the generative model and the original data. Returns vector of mean squared errors."""
+        diffs = X - self.generate_model(acts)
+        return np.mean(diffs**2,axis=0)/np.mean(X**2,axis=0)
+    
+    def snr(self, data, acts):
+        """Returns the signal-noise ratio for the given data and coefficients."""
+        sig = np.var(data,axis=0)
+        noise = np.var(data - self.Q.T.dot(acts), axis=0)
+        return np.mean(sig/noise)
     
     def learn(self, data, coeffs, normalize = True):
         """Adjust dictionary elements according to gradient descent on the 
@@ -79,7 +95,7 @@ class DictLearner(object):
             plt.plot(self.errorhist)
             plt.show()            
     
-    def show_dict(self, stimset=None, cmap='jet', subset=None, savestr=None):
+    def show_dict(self, stimset=None, cmap='jet', subset=None, square=False, savestr=None):
         """The StimSet object handles the plotting of the current dictionary."""
         stimset = stimset or self.stims
         if subset is not None:
@@ -87,7 +103,7 @@ class DictLearner(object):
             Qs = self.Q[np.sort(indices)]
         else:
             Qs = self.Q
-        array = stimset.stimarray(Qs[::-1])
+        array = stimset.stimarray(Qs[::-1], square=square)
         plt.figure()        
         arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
         plt.axis('off')
@@ -95,6 +111,18 @@ class DictLearner(object):
         if savestr is not None:
             plt.savefig(savestr, bbox_inches='tight')
         return arrayplot
+        
+    def show_element(self, index, cmap='jet', labels=None, savestr=None):
+        elem = self.stims.stim_for_display(self.Q[index])
+        plt.figure()
+        plt.imshow(elem.T, interpolation='nearest',cmap=cmap, aspect='auto', origin='lower')
+        if labels is None:
+            plt.axis('off')
+        else:
+            plt.colorbar()
+        if savestr is not None:
+            plt.savefig(savestr, bbox_inches='tight')
+       
         
     def rand_dict(self):
         Q = np.random.randn(self.nunits, self.stims.datasize)

@@ -4,7 +4,7 @@ Created on Fri Aug 21 15:32:36 2015
 
 @author: Eric
 """
-
+import matplotlib.pyplot as plt
 import scipy.io as io
 #import pickle
 import LCALearner
@@ -17,9 +17,10 @@ sys.modules['pca'] = pca.pca #this is a workaround to get the pickled pca to loa
 #lca = LCALearner.LCALearner(images, nunits=300, learn_rate = .001, batch_size=100, infrate=.01, niter=100,
 #                            min_thresh = 0.8, adapt=.98)
 
-datafolder = ''#/audition/Data/'
+prep = 'new'
+resultsfolder = '../audition/Results/halfOC/'+prep +'prep/'
 
-overcompleteness = 4
+overcompleteness = 0.5
 numinput = 200
 numunits = int(overcompleteness*numinput)
 #picklefile = datafolder + 'spectropca5.pickle'
@@ -34,7 +35,7 @@ numunits = int(overcompleteness*numinput)
 #scale = np.std(spectros)
 #spectros = spectros/scale
 
-stuff = io.loadmat('../audition/Nicole Code/PCAmatricesnew.mat')
+stuff = io.loadmat('../audition/Nicole Code/PCAmatrices'+prep+'.mat')
 mypca = pca.pca.PCA(dim=200,whiten=True)
 mypca.eVectors = stuff['E'].reshape((25,256,200))[:,::-1,:].reshape((6400,200)).T # flip the PC spectrograms upside down
 mypca.sValues = np.sqrt(np.diag(np.abs(stuff['D1'])))
@@ -43,12 +44,15 @@ mypca.mean_vec = np.zeros(6400)
 mypca.ready=True
 origshape = (25,256)
 
-spectros = io.loadmat('../audition/Nicole Code/dMatPCAnew.mat')['dMatPCA'].T
+spectros = io.loadmat('../audition/Nicole Code/dMatPCA'+prep+'.mat')['dMatPCA'].T
 
 lca = LCALearner.LCALearner(spectros, numunits, datatype="spectro", pca = mypca,  stimshape=origshape, paramfile='dummy')
 
-lca.tolerance = .01
-lca.max_iter = 4
+lca.load_params(resultsfolder+'lam0.6newdropiters.pickle')#'lam0.6new.pickle')
+#lca.sort_dict(allstims=True, plot=True)
+#plt.savefig(resultsfolder+'4OC0_6'+prep+'usage.png')
+#lca.show_oriented_dict(batch_size=1000)
+#plt.savefig(resultsfolder+'4OC0_6'+prep+'.png')
 
 #lca.min_thresh = .6
 #lca.save_params('halfOC_alt.pickle')

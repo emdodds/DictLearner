@@ -72,16 +72,20 @@ class LCALearner(DictLearner):
         self.tolerance = tolerance
         self.max_iter = max_iter
         self.gpu = gpu
+        self.meanacts = np.zeros(nunits)
         super().__init__(learnrate, paramfile = paramfile, theta=theta, moving_avg_rate=moving_avg_rate)
         
-    def show_oriented_dict(self, batch_size='all', *args, **kwargs):
+    def show_oriented_dict(self, batch_size=None, *args, **kwargs):
         """Display tiled dictionary as in DictLearn.show_dict(), but with elements inverted
         if their activities tend to be negative."""
-        if batch_size == 'all':
-            X = self.stims.data.T
+        if batch_size is None:
+            means = self.meanacts
         else:
-            X = self.stims.rand_stim(batch_size)
-        means = np.mean(self.infer(X)[0],axis=1)
+            if batch_size == 'all':
+                X = self.stims.data.T
+            else:
+                X = self.stims.rand_stim(batch_size)
+            means = np.mean(self.infer(X)[0],axis=1)
         toflip = means < 0
         realQ = self.Q
         self.Q[toflip] = -self.Q[toflip]
@@ -89,7 +93,7 @@ class LCALearner(DictLearner):
         self.Q = realQ
         return result
     
-    def infer_cpu(self, X, infplots=False, tolerance=None, max_iter = None):
+    def infer_cpu(self, X, infplot=False, tolerance=None, max_iter = None):
         """Infer sparse approximation to given data X using this LCALearner's 
         current dictionary. Returns coefficients of sparse approximation.
         Optionally plot reconstruction error vs iteration number.
@@ -117,11 +121,9 @@ class LCALearner(DictLearner):
         thresh = np.absolute(b).mean(1) 
         thresh = np.array([np.max([th, self.min_thresh]) for th in thresh])
         
-        if infplots:
-            errors = np.zeros((self.niter, nstim))
-            histories = np.zeros((ndict, self.niter))
-            shistories = np.zeros((ndict, self.niter))
-            threshhist = np.zeros((nstim, self.niter))
+        if infplot:
+            errors = np.zeros(self.niter)
+            allerrors = np.array([])
         
         error = tolerance+1
         outer_k = 0
@@ -138,35 +140,31 @@ class LCALearner(DictLearner):
                     s[:] = u
                     s[np.absolute(s) < thresh[:,np.newaxis]] = 0
                     
-                if infplots:
-                    histories[:,kk] = u[0,:]
-                    shistories[:,kk] = s[0,:]
-                    errors[kk,:] = np.mean((X.T - s.dot(self.Q))**2,axis=1)
-                    threshhist[:,kk] = thresh
+                if infplot:
+                    errors[kk] = np.mean(self.compute_errors(s.T,X))
                     
                 thresh = self.adapt*thresh
                 thresh[thresh<self.min_thresh] = self.min_thresh
                 
             error = np.mean((X.T - s.dot(self.Q))**2)
             outer_k = outer_k+1
+            if infplot:
+                allerrors = np.concatenate((allerrors,errors))
         
-        if infplots:
+        if infplot:
             plt.figure(3)
             plt.clf()
-            plt.plot(errors)
-            plt.figure(4)
-            plt.clf()
-            hists = np.concatenate((histories,shistories),axis=0)
-            plt.plot(hists.T)
-            return s.T, errors, histories, shistories, threshhist
+            plt.plot(allerrors)
+            return s.T, errors
         return s.T, u.T, thresh
             
     def test_inference(self, niter=None):
         temp = self.niter
         self.niter = niter or self.niter
         X = self.stims.rand_stim()
-        s = self.infer(X, infplots=True)
+        s = self.infer(X, infplot=True)[0]
         self.niter = temp
+        print("Final SNR: " + str(self.snr(X,s)))
         return s
                   
     def sort_dict(self, batch_size=None, plot = False, allstims = True, savestr=None):
@@ -314,14 +312,15 @@ class LCALearner(DictLearner):
     except NameError:
         pass
         
-    def infer(self, X, infplots=False, tolerance=None, max_iter = None):
+    def infer(self, X, infplot=False, tolerance=None, max_iter = None):
         if self.gpu:
             # right now there is no support for multiple blocks of iterations, stopping after error crosses threshold, or plots monitoring inference
             results= self.infer_gpu(X.T)
         else:
-            results= self.infer_cpu(X, infplots, tolerance, max_iter)
+            results= self.infer_cpu(X, infplot, tolerance, max_iter)
         acts = results[0]
         self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
         L0means = np.mean(acts != 0,axis=1)
         self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
+        self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*acts.mean(1)
         return results

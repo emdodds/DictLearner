@@ -31,7 +31,7 @@ class StimSet(object):
         return X  
     
     @staticmethod
-    def _stimarray(stims, stimshape):
+    def _stimarray(stims, stimshape, square=False):
         """Returns an array of the stimuli reshaped to 2d and tiled."""    
         length, height = stimshape
         assert length*height == stims.shape[1]
@@ -39,7 +39,7 @@ class StimSet(object):
         nstim = stims.shape[0]
         
         # n and m are respectively the numbers of rows and columns of stimuli in the array
-        if length == height:
+        if square:
             if np.floor(np.sqrt(nstim))**2 != nstim:
                 n = int(np.ceil(np.sqrt(nstim/2.)))
                 m = int(np.ceil(nstim/n))
@@ -68,9 +68,9 @@ class StimSet(object):
                 
         return array.T
     
-    def stimarray(self, stims, stimshape=None):
+    def stimarray(self, stims, stimshape=None, square=False):
         stimshape = stimshape or self.stimshape
-        return StimSet._stimarray(stims, stimshape)
+        return StimSet._stimarray(stims, stimshape, square)
         
     def modspec(self, elem):
         image = elem.reshape(self.stimshape)
@@ -79,6 +79,9 @@ class StimSet(object):
         power = np.abs(fourier)**2
         avgmag = np.array([(power[ii] + power[-ii])/2 for ii in range(mid)])
         return avgmag
+        
+    def stim_for_display(self, stim):
+        return stim.reshape(self.stimshape)
         
 class ImageSet(StimSet):
     """Currently only compatible with square images (but arbitrary patches)."""
@@ -121,9 +124,12 @@ class PCvecSet(StimSet):
         self.datasize = data.shape[1]
         super().__init__(data, stimshape, batch_size)
         
-    def stimarray(self, stims):
+    def stimarray(self, stims, square=False):
         reconst = self.pca.inverse_transform(stims)
-        return super().stimarray(reconst, self.stimshape)
+        return super().stimarray(reconst, self.stimshape, square)
         
     def modspec(self, elem):
         return super().modspec(self.pca.inverse_transform(elem))
+        
+    def stim_for_display(self, stim):
+        return super().stim_for_display(self.pca.inverse_transform(stim))
