@@ -38,7 +38,7 @@ class DictLearner(object):
         """Given a batch of data and activities, compute the squared error between
         the generative model and the original data. Returns vector of mean squared errors."""
         diffs = X - self.generate_model(acts)
-        return np.mean(diffs**2,axis=0)/np.mean(X**2,axis=0)
+        return np.mean(diffs**2,axis=0)/np.mean(X**2,axis=0)       
     
     def snr(self, data, acts):
         """Returns the signal-noise ratio for the given data and coefficients."""
@@ -64,7 +64,7 @@ class DictLearner(object):
             self.Q = normmatrix.dot(self.Q)
         return np.mean(R**2)
             
-    def run(self, ntrials = 1000, batch_size = None, show=True, rate_decay=None, normalize = True):
+    def run(self, ntrials = 1000, batch_size = None, show=False, rate_decay=None, normalize = True):
         batch_size = batch_size or self.stims.batch_size
         errors = np.zeros(min(ntrials,1000))
         L0means = np.zeros_like(errors)
