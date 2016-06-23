@@ -10,22 +10,37 @@ Includes gradient descent on MSE energy function as a default learning method.
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
+import StimSet
 from scipy import ndimage
 
 class DictLearner(object):
 
-    def __init__(self, learnrate, paramfile=None, theta=0, moving_avg_rate=0.001):
+    def __init__(self, data, learnrate, nunits, paramfile=None, theta=0, moving_avg_rate=0.001,
+                 stimshape=None, datatype="image", batch_size=100, pca=None):
+                     
+        self.nunits = nunits
+        self.batch_size = batch_size
         self.learnrate = learnrate
-        self.Q = self.rand_dict()
         self.errorhist = np.array([])
         self.paramfile = paramfile
         self.theta=theta
         self.L0hist = np.array([])
         self.L1hist = np.array([])
-        nunits = self.Q.shape[0]
         self.L0acts = np.zeros(nunits)
         self.L1acts = np.zeros(nunits)
         self.moving_avg_rate=moving_avg_rate
+        
+        if datatype == "image":
+            stimshape = stimshape or (16,16)
+            self.stims = StimSet.ImageSet(data, batch_size = self.batch_size, buffer=20, stimshape = stimshape)
+        elif datatype == "spectro" and pca is not None:
+            if stimshape == None:
+                raise Exception("When using PC representations, you need to provide the shape of the original stimuli.")
+            self.stims = StimSet.PCvecSet(data, stimshape, pca, self.batch_size)
+        else:
+            raise ValueError("Specified data type not currently supported.")
+            
+        self.Q = self.rand_dict()
     
     def infer(self, data):
         raise NotImplementedError
@@ -38,7 +53,13 @@ class DictLearner(object):
         """Given a batch of data and activities, compute the squared error between
         the generative model and the original data. Returns vector of mean squared errors."""
         diffs = X - self.generate_model(acts)
-        return np.mean(diffs**2,axis=0)/np.mean(X**2,axis=0)       
+        return np.mean(diffs**2,axis=0)/np.mean(X**2,axis=0)      
+        
+    def smoothed_error(self, window_size=1000, start=0, end=-1):
+        """Plots a moving average of the error history with the given averaging window."""
+        window = np.ones(int(window_size))/float(window_size)
+        smoothed = np.convolve(self.errorhist[start:end], window, 'valid')
+        plt.plot(smoothed)       
     
     def snr(self, data, acts):
         """Returns the signal-noise ratio for the given data and coefficients."""

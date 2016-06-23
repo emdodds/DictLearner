@@ -52,18 +52,9 @@ class LCALearner(DictLearner):
             paramfile: a pickle file with dictionary and error history is stored here     
             gpu: whether or not to use the GPU implementation of
         """
-        self.batch_size = batch_size
-        learnrate = learnrate or 1./self.batch_size
-        if datatype == "image":
-            stimshape = stimshape or (16,16)
-            self.stims = StimSet.ImageSet(data, batch_size = self.batch_size, buffer=20, stimshape = stimshape)
-        elif datatype == "spectro" and pca is not None:
-            if stimshape == None:
-                raise Exception("When using PC representations, you need to provide the shape of the original stimuli.")
-            self.stims = StimSet.PCvecSet(data, stimshape, pca, self.batch_size)
-        else:
-            raise ValueError("Specified data type not currently supported.")
-        self.nunits = nunits
+        
+        learnrate = learnrate or 1./batch_size
+        
         self.infrate = infrate
         self.niter = niter
         self.min_thresh = min_thresh
@@ -73,7 +64,8 @@ class LCALearner(DictLearner):
         self.max_iter = max_iter
         self.gpu = gpu
         self.meanacts = np.zeros(nunits)
-        super().__init__(learnrate, paramfile = paramfile, theta=theta, moving_avg_rate=moving_avg_rate)
+        super().__init__(data, learnrate, nunits, paramfile = paramfile, theta=theta, moving_avg_rate=moving_avg_rate, 
+                            stimshape=stimshape, datatype=datatype, batch_size=batch_size, pca=pca)
         
     def show_oriented_dict(self, batch_size=None, *args, **kwargs):
         """Display tiled dictionary as in DictLearn.show_dict(), but with elements inverted
