@@ -29,6 +29,7 @@ class DictLearner(object):
         self.L0acts = np.zeros(nunits)
         self.L1acts = np.zeros(nunits)
         self.moving_avg_rate=moving_avg_rate
+        self.corrmatrix_ave = np.zeros((nunits,nunits))
         
         if datatype == "image":
             stimshape = stimshape or (16,16)
@@ -87,34 +88,41 @@ class DictLearner(object):
             
     def run(self, ntrials = 1000, batch_size = None, show=False, rate_decay=None, normalize = True):
         batch_size = batch_size or self.stims.batch_size
-        errors = np.zeros(min(ntrials,1000))
-        L0means = np.zeros_like(errors)
-        L1means = np.zeros_like(errors)
+        prevtrials = len(self.errorhist)
+        self.errorhist = np.concatenate((self.errorhist,np.zeros(ntrials)))
+        self.L0hist = np.concatenate((self.L0hist,np.zeros(ntrials)))
+        self.L1hist = np.concatenate((self.L1hist,np.zeros(ntrials)))
         for trial in range(ntrials):
             if trial % 50 == 0:
                 print (trial)
+                
             X = self.stims.rand_stim(batch_size=batch_size)
-            coeffs,_,_ = self.infer(X)
-            thiserror = self.learn(X, coeffs, normalize)
-            errors[trial % 1000] = thiserror
-            L0means[trial % 1000] = np.mean(coeffs!=0)
-            L1means[trial % 1000] = np.mean(np.abs(coeffs))
+            acts,_,_ = self.infer(X)
+            thiserror = self.learn(X, acts, normalize)
+            
+            # store statistics
+            self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
+            L0means = np.mean(acts != 0, axis=1)
+            self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
+            self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*acts.mean(1)
+            self.errorhist[trial + prevtrials] = thiserror
+            self.L0hist[trial + prevtrials] = np.mean(acts!=0)
+            self.L1hist[trial + prevtrials] = np.mean(np.abs(acts))
+            corrmatrix = (acts-self.meanacts).dot((acts-self.meanacts).T)/batch_size
+            self.corrmatrix_ave = (1-self.moving_avg_rate)*self.corrmatrix_ave + self.moving_avg_rate*corrmatrix
             
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
-                print ("Saving progress to " + self.paramfile)
-                self.errorhist = np.concatenate((self.errorhist, errors))
-                self.L0hist = np.concatenate((self.L0hist, L0means))
-                self.L1hist = np.concatenate((self.L1hist, L1means))
                 try: 
+                    print ("Saving progress to " + self.paramfile)
                     self.save_params()
-                except ValueError as er:
+                except (ValueError, TypeError) as er:
                     print ('Failed to save parameters. ', er)
             if rate_decay is not None:
                 self.adjust_rates(rate_decay)
         if show:
             plt.figure()
             plt.plot(self.errorhist)
-            plt.show()            
+            plt.show()         
     
     def show_dict(self, stimset=None, cmap='jet', subset=None, square=False, savestr=None):
         """The StimSet object handles the plotting of the current dictionary."""
@@ -173,8 +181,7 @@ class DictLearner(object):
             plt.ylabel(kwargs.ylabel)
         except:
             pass
-        
-        
+                
     def load_params(self, filename=None):
         if filename is None:
             filename = self.paramfile

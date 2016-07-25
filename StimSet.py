@@ -73,6 +73,7 @@ class StimSet(object):
         return StimSet._stimarray(stims, stimshape, square)
         
     def modspec(self, elem):
+        """Compute the modulation power spectrum."""
         image = elem.reshape(self.stimshape)
         fourier =  np.fft.rfft2(image)
         mid = int(fourier.shape[0]/2)

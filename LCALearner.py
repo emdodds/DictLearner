@@ -9,16 +9,12 @@ Dictionary learner that uses LCA for inference and gradient descent for learning
 """
 import numpy as np
 import matplotlib.pyplot as plt
-import StimSet
 from DictLearner import DictLearner
 import pickle
 try:
-    from numbapro import cuda
-    import numbapro.cudalib.cublas as cublas
-    from numba import *
+    import LCAonGPU
 except ImportError:
-    print("Unable to import gpu libraries. Only cpu inference method available.")
-from math import ceil
+    print("Unable to load GPU implementation. Only CPU inference available.")
 
 
 class LCALearner(DictLearner):
@@ -149,6 +145,13 @@ class LCALearner(DictLearner):
             plt.plot(allerrors)
             return s.T, errors
         return s.T, u.T, thresh
+
+    def infer(self, X, infplot=False, tolerance=None, max_iter = None):
+        if self.gpu:
+            # right now there is no support for multiple blocks of iterations, stopping after error crosses threshold, or plots monitoring inference
+            return LCAonGPU.infer(self, X.T)
+        else:
+            return self.infer_cpu(X, infplot, tolerance, max_iter)
             
     def test_inference(self, niter=None):
         temp = self.niter
@@ -210,10 +213,18 @@ class LCALearner(DictLearner):
                 self.Q, params, histories = pickle.load(f)                
             self.learnrate, self.theta, self.min_thresh, self.infrate, self.niter, self.adapt, self.max_iter, self.tolerance = params
             try:
-                self.errorhist, self.L0acts, self.L1acts = histories
+                self.errorhist, self.L0acts, self.L0hist, self.L1acts, self.L1hist, self.corrmatrix_ave = histories
             except ValueError:
-                print("Loading old file. Moving average activities not available.")
-                self.errorhist = histories
+                print('Loading old file. Correlation matrix not available.')
+                try:
+                    self.errorhist, self.L0acts, self.L0hist, self.L1acts, self.L1hist = histories
+                except ValueError:
+                    print('Loading old file. Activity histories not available.')
+                    try:
+                        self.errorhist, self.L0acts, self.L1acts = histories
+                    except ValueError:
+                        print("Loading old file. Moving average activities not available.")
+                        self.errorhist = histories
         except ValueError:
             print("Loading very old file. Only dictionary and error history available.")
             with open(filename, 'rb') as f:
@@ -227,92 +238,6 @@ class LCALearner(DictLearner):
         self.paramfile = filename        
         params = (self.learnrate, self.theta, self.min_thresh, self.infrate, 
                   self.niter, self.adapt, self.max_iter, self.tolerance)
-        histories = (self.errorhist,self.L0acts, self.L1acts)
+        histories = (self.errorhist,self.L0acts, self.L0hist, self.L1acts, self.L1hist, self.corrmatrix_ave)
         with open(filename, 'wb') as f:
             pickle.dump([self.Q, params, histories], f)
-        
-    ### GPU implementation by Jesse Livezey, adapted by EMD
-    try:
-        @cuda.jit('void(f4[:,:])')
-        def csub(c):
-            n = c.shape[0]
-            i = cuda.grid(1)
-            
-            if i<n:
-                c[i,i] = 0.
-    
-        @cuda.jit('void(f4[:,:],f4[:,:],f4[:,:],f4[:,:],f4[:,:],f4,f4[:],f4,f4,i4)')
-        def iterate(c,b,ci,u,s,eta,thresh,lamb,adapt,softThresh):
-            n = u.shape[0]
-            m = u.shape[1]
-            i,j = cuda.grid(2)
-            
-            if i<n and j< m:
-                u[i,j] = eta*(b[i,j]-ci[i,j])+(1-eta)*u[i,j]
-                if u[i,j] < thresh[i] and u[i,j] > -thresh[i]:
-                    s[i,j] = 0.
-                elif softThresh == 1:
-                    if u[i,j] > 0.:
-                        s[i,j] = u[i,j]-thresh[i]
-                    else:
-                        s[i,j] = u[i,j]+thresh[i]
-                else:
-                    s[i,j] = u[i,j]
-                thresh[i] = thresh[i]*adapt
-                if thresh[i] < lamb:
-                    thresh[i] = lamb
-        
-        def infer_gpu(self, stimuli, coeffs=None):
-        #Get Blas routines
-            blas = cublas.Blas()
-        #Initialize arrays
-            numDict = self.Q.shape[0]
-            numStim = stimuli.shape[0]
-            dataLength = stimuli.shape[1]
-            u = np.zeros((numStim, numDict), dtype=np.float32, order='F')
-            if coeffs is not None:
-                u[:] = np.atleast_2d(coeffs)
-            d_u = cuda.to_device(u)
-            d_s = cuda.to_device(np.zeros((numStim,numDict),dtype=np.float32,order='F'))
-            d_b = cuda.to_device(np.zeros((numStim,numDict),dtype=np.float32,order='F'))
-            d_ci = cuda.to_device(np.zeros((numStim,numDict),dtype=np.float32,order='F'))
-            d_c = cuda.to_device(np.zeros((numDict,numDict),dtype=np.float32,order='F'))
-            
-            #Move inputs to GPU
-            d_dictionary = cuda.to_device(np.array(self.Q,dtype=np.float32,order='F'))
-            d_stimuli = cuda.to_device(np.array(stimuli,dtype=np.float32,order='F'))
-        
-            blockdim2 = (32,32) # TODO: experiment, was all 32s
-            blockdim1 = 32
-            griddimcsub = int(ceil(numDict/blockdim1))
-            griddimi = (int(ceil(numStim/blockdim2[0])),int(ceil(numDict/blockdim2[1])))
-            
-            #Calculate c: overlap of basis functions with each other minus identity
-            blas.gemm('N','T',numDict,numDict,dataLength,1.,d_dictionary,d_dictionary,0.,d_c)
-            LCALearner.csub[griddimcsub,blockdim1](d_c)
-            blas.gemm('N','T',numStim,numDict,dataLength,1.,d_stimuli,d_dictionary,0.,d_b)
-            thresh = np.mean(np.absolute(d_b.copy_to_host()),axis=1)
-            d_thresh = cuda.to_device(thresh)
-            #Update u[i] and s[i] for niter time steps
-            for kk in range(self.niter):
-                #Calculate ci: amount other neurons are stimulated times overlap with rest of basis
-                blas.gemm('N','N',numStim,numDict,numDict,1.,d_s,d_c,0.,d_ci)
-                LCALearner.iterate[griddimi,blockdim2](d_c,d_b,d_ci,d_u,d_s,self.infrate,d_thresh,self.min_thresh,self.adapt,self.softthresh)
-            u = d_u.copy_to_host()
-            s = d_s.copy_to_host()
-            return s.T,u.T,thresh
-    except NameError:
-        pass
-        
-    def infer(self, X, infplot=False, tolerance=None, max_iter = None):
-        if self.gpu:
-            # right now there is no support for multiple blocks of iterations, stopping after error crosses threshold, or plots monitoring inference
-            results= self.infer_gpu(X.T)
-        else:
-            results= self.infer_cpu(X, infplot, tolerance, max_iter)
-        acts = results[0]
-        self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
-        L0means = np.mean(acts != 0,axis=1)
-        self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
-        self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*acts.mean(1)
-        return results
