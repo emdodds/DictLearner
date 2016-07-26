@@ -28,6 +28,7 @@ class DictLearner(object):
         self.L1hist = np.array([])
         self.L0acts = np.zeros(nunits)
         self.L1acts = np.zeros(nunits)
+        self.meanacts = np.zeros_like(self.L0acts)
         self.moving_avg_rate=moving_avg_rate
         self.corrmatrix_ave = np.zeros((nunits,nunits))
         
@@ -104,11 +105,13 @@ class DictLearner(object):
             self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
             L0means = np.mean(acts != 0, axis=1)
             self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
-            self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*acts.mean(1)
+            means = acts.mean(1)
+            self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*means
             self.errorhist[trial + prevtrials] = thiserror
             self.L0hist[trial + prevtrials] = np.mean(acts!=0)
             self.L1hist[trial + prevtrials] = np.mean(np.abs(acts))
-            corrmatrix = (acts-self.meanacts).dot((acts-self.meanacts).T)/batch_size
+            actdevs = acts-means[:,np.newaxis]
+            corrmatrix = (actdevs).dot(actdevs.T)/batch_size
             self.corrmatrix_ave = (1-self.moving_avg_rate)*self.corrmatrix_ave + self.moving_avg_rate*corrmatrix
             
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:

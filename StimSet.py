@@ -5,6 +5,7 @@ Created on Thu Aug 20 18:23:08 2015
 @author: Eric Dodds
 """
 import numpy as np
+import matplotlib.pyplot as plt
 
 class StimSet(object):
     def __init__(self, data, stimshape, batch_size=None):
@@ -117,11 +118,10 @@ class ImageSet(StimSet):
         return X
         
 class PCvecSet(StimSet):
+    """Principal component vector representations of arbitrary data."""    
     
     def __init__(self, data, stimshape, pca, batch_size=None):
         self.pca = pca
-        # normalize each data point
-        # data = data/(np.std(data,axis=1)[:,np.newaxis])       # TODO: uncomment maybe?
         self.datasize = data.shape[1]
         super().__init__(data, stimshape, batch_size)
         
@@ -134,3 +134,24 @@ class PCvecSet(StimSet):
         
     def stim_for_display(self, stim):
         return super().stim_for_display(self.pca.inverse_transform(stim))
+        
+class WaveformSet(StimSet):
+    """1D signals, especially audio, of uniform length."""
+    
+    def tiledplot(self, stims):
+        """Tiled plots of the given stumili. Zeroth index is over stimuli."""
+        nstim = stims.shape[0]
+        plotrows = int(np.sqrt(nstim))
+        plotcols = int(np.ceil(nstim/plotrows))
+        f, axes = plt.subplots(plotrows, plotcols, sharex=True, sharey=True)
+        for ii in range(nstim):
+            axes.flatten()[ii].plot(stims[ii])
+        f.subplots_adjust(hspace=0, wspace=0)
+        plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
+        plt.setp([a.get_yticklabels() for a in f.axes[:-1]], visible=False)
+        
+class WaveformPCSet(PCvecSet, WaveformSet):
+    """Specifically for PCA reps of waveforms."""
+    
+    def tiledplot(self, stims):
+        super().tiledplot(self.pca.inverse_transform(stims))
