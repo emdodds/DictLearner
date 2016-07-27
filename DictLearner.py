@@ -37,12 +37,6 @@ class DictLearner(object):
         self.Q = self.rand_dict()
         
     def _load_stims(self, data, datatype, stimshape, pca):
-        if stimshape is None:
-            linput = np.sqrt(self.ninput)
-            stimshape = (int(linput), int(linput))
-            if linput != stimshape[0]:
-                raise ValueError("Input size not a perfect square. Please provide image shape.")        
-        
         if datatype == "image":
             stimshape = stimshape or (16,16)
             self.stims = StimSet.ImageSet(data, batch_size = self.batch_size, buffer=20, stimshape = stimshape)
