@@ -32,6 +32,17 @@ class DictLearner(object):
         self.moving_avg_rate=moving_avg_rate
         self.corrmatrix_ave = np.zeros((nunits,nunits))
         
+        self._load_stims(data, datatype, stimshape, pca)
+            
+        self.Q = self.rand_dict()
+        
+    def _load_stims(self, data, datatype, stimshape, pca):
+        if stimshape is None:
+            linput = np.sqrt(self.ninput)
+            stimshape = (int(linput), int(linput))
+            if linput != stimshape[0]:
+                raise ValueError("Input size not a perfect square. Please provide image shape.")        
+        
         if datatype == "image":
             stimshape = stimshape or (16,16)
             self.stims = StimSet.ImageSet(data, batch_size = self.batch_size, buffer=20, stimshape = stimshape)
@@ -39,10 +50,10 @@ class DictLearner(object):
             if stimshape == None:
                 raise Exception("When using PC representations, you need to provide the shape of the original stimuli.")
             self.stims = StimSet.PCvecSet(data, stimshape, pca, self.batch_size)
+        elif datatype == "waveform" and pca is not None:
+            self.stims = StimSet.WaveformPCSet(data, stimshape, pca, self.batch_size)
         else:
             raise ValueError("Specified data type not currently supported.")
-            
-        self.Q = self.rand_dict()
     
     def infer(self, data):
         raise NotImplementedError

@@ -139,7 +139,8 @@ class WaveformSet(StimSet):
     """1D signals, especially audio, of uniform length."""
     
     def tiledplot(self, stims):
-        """Tiled plots of the given stumili. Zeroth index is over stimuli."""
+        """Tiled plots of the given stumili. Zeroth index is over stimuli.
+        Kind of slow, expect about 10s for 100 plots."""
         nstim = stims.shape[0]
         plotrows = int(np.sqrt(nstim))
         plotcols = int(np.ceil(nstim/plotrows))
