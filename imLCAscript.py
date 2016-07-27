@@ -30,7 +30,7 @@ lam = args.lam
 numinput = 256
 numunits = int(oc*numinput)
 
-data = io.loadmat(datafile)
+data = io.loadmat(datafile)["IMAGES"]
 
 lca = LCALearner.LCALearner(data, numunits, paramfile='dummy')
 
