@@ -133,7 +133,7 @@ class DictLearner(object):
             plt.show()         
     
     def show_dict(self, stimset=None, cmap='jet', subset=None, square=False, savestr=None):
-        """The StimSet object handles the plotting of the current dictionary."""
+        """Plot an array of tiled dictionary elements. The 0th element is in the top right."""
         stimset = stimset or self.stims
         if subset is not None:
             indices = np.random.choice(self.Q.shape[0], subset)
