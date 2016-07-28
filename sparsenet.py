@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class Sparsenet(DictLearner.DictLearner):
     """A sparse dictionary learner based on (Olshausen and Field, 1996)."""
     
-    def __init__(self, data, learnrate, nunits, measure='abs', infrate=0.01,
+    def __init__(self, data, nunits, learnrate=0.01, measure='abs', infrate=0.01,
                  niter=200, lamb=0.15, var_goal=0.1, gain_rate=0.02,
                  var_eta=0.1, **kwargs):
         self.niter=niter
