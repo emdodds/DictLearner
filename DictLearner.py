@@ -135,7 +135,7 @@ class DictLearner(object):
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
                 try: 
                     print ("Saving progress to " + self.paramfile)
-                    self.save_params()
+                    self.save()
                 except (ValueError, TypeError) as er:
                     print ('Failed to save parameters. ', er)
             if rate_decay is not None:
