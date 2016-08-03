@@ -27,6 +27,7 @@ class Sparsenet(DictLearner.DictLearner):
         super().__init__(data, learnrate, nunits, **kwargs)
         
     def dSda(self, acts):
+        """Returns the derivative of the activity-measuring function, S in the Nature paper."""
         if self.measure == 'log':
             # TODO: Why doesn't this work well? The activities in the denominator may need to be scaled?
             return acts*(1/(1+acts*acts))
@@ -36,18 +37,19 @@ class Sparsenet(DictLearner.DictLearner):
             return 2*acts*np.exp(-acts**2)
             
     
-    def infer(self,X, plot=False):
+    def infer(self, X, infplot=False):
         acts = np.zeros((self.nunits,self.batch_size))
-        costY1 = np.zeros(self.niter)
-                       
+        if infplot:
+            costY1 = np.zeros(self.niter)
+        phi_sq = self.Q.dot(self.Q.T)
+        QX = self.Q.dot(X)
         for k in range(self.niter):    
-            phi_sq = self.Q.dot(self.Q.T)
-            QX = self.Q.dot(X)
             da_dt = QX - phi_sq.dot(acts) - self.lamb*self.dSda(acts)
             acts=(1-self.infrate)*acts+self.infrate*(da_dt)
-
-            costY1[k]=np.mean((X.T-np.dot(acts.T,self.Q))**2) 
-        if plot:
+            
+            if infplot:
+                costY1[k]=np.mean((X.T-np.dot(acts.T,self.Q))**2) 
+        if infplot:
             plt.plot(costY1)
         return acts, None, None
     

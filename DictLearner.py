@@ -55,8 +55,17 @@ class DictLearner(object):
         else:
             raise ValueError("Specified data type not currently supported.")
     
-    def infer(self, data):
+    def infer(self, data, infplot):
         raise NotImplementedError
+        
+    def test_inference(self, niter=None):
+        temp = self.niter
+        self.niter = niter or self.niter
+        X = self.stims.rand_stim()
+        s = self.infer(X, infplot=True)[0]
+        self.niter = temp
+        print("Final SNR: " + str(self.snr(X,s)))
+        return s
         
     def generate_model(self, acts):
         """Reconstruct inputs using linear generative model."""
@@ -72,7 +81,20 @@ class DictLearner(object):
         """Plots a moving average of the error history with the given averaging window."""
         window = np.ones(int(window_size))/float(window_size)
         smoothed = np.convolve(self.errorhist[start:end], window, 'valid')
-        plt.plot(smoothed)       
+        plt.plot(smoothed)
+        
+    def progress_plot(self, window_size=1000, norm=1, start=0, end=-1):
+        """Plots a moving average of the error and activity history with the given averaging window."""
+        window = np.ones(int(window_size))/float(window_size)
+        smoothederror = np.convolve(self.errorhist[start:end], window, 'valid')
+        if norm==2:
+            acthist = self.L2hist
+        elif norm==0:
+            acthist = self.L0hist
+        else:
+            acthist = self.L1hist
+        smoothedactivity = np.convolve(acthist[start:end], window, 'valid')
+        plt.plot(smoothederror, 'b', smoothedactivity, 'g')
     
     def snr(self, data, acts):
         """Returns the signal-noise ratio for the given data and coefficients."""
