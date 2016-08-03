@@ -6,9 +6,7 @@ Created on Mon Jul 25 13:54:12 2016
 """
 
 import argparse
-import pickle
 import LCALearner
-import numpy as np
 import scipy.io as io
 
 parser = argparse.ArgumentParser(description="Learn dictionaries for LCA with given parameters.")
@@ -40,10 +38,8 @@ lca.niter = niter
 lca.infrate = 0.01
 
 savestr = resultsfolder+'im'+str(oc)+'OC' + str(lam) + datasuffix
-lca.save_params(savestr+'.pickle')
+lca.save(savestr+'.pickle')
+lca.run(ntrials=100000)
+lca.learnrate=0.0001
 lca.run(ntrials=50000)
-#lca.run(ntrials=200000, rate_decay=.99995)
-lca.niter=500
-lca.run(ntrials=10000)
-lca.sort_dict()
-lca.save_params()
+lca.save()

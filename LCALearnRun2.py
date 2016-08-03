@@ -48,7 +48,7 @@ spectros = io.loadmat('../audition/Nicole Code/dMatPCA'+prep+'.mat')['dMatPCA'].
 
 lca = LCALearner.LCALearner(spectros, numunits, datatype="spectro", pca = mypca,  stimshape=origshape, paramfile='dummy')
 
-lca.load_params(resultsfolder+'lam0.6newdropiters.pickle')#'lam0.6new.pickle')
+lca.load(resultsfolder+'lam0.6newdropiters.pickle')#'lam0.6new.pickle')
 #lca.sort_dict(allstims=True, plot=True)
 #plt.savefig(resultsfolder+'4OC0_6'+prep+'usage.png')
 #lca.show_oriented_dict(batch_size=1000)

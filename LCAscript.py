@@ -40,8 +40,8 @@ lca.niter = niter
 lca.infrate = 0.01
 
 savestr = resultsfolder+str(oc)+'OC' + str(lam) + datasuffix
-lca.save_params(savestr+'.pickle')
+lca.save(savestr+'.pickle')
 lca.run(ntrials=50000)
 lca.run(ntrials=200000, rate_decay=.99995)
 lca.sort_dict()
-lca.save_params()
+lca.save()
