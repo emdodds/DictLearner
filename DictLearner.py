@@ -21,20 +21,26 @@ class DictLearner(object):
         self.nunits = nunits
         self.batch_size = batch_size
         self.learnrate = learnrate
-        self.errorhist = np.array([])
         self.paramfile = paramfile
-        self.theta=theta
-        self.L0hist = np.array([])
-        self.L1hist = np.array([])
-        self.L0acts = np.zeros(nunits)
-        self.L1acts = np.zeros(nunits)
-        self.meanacts = np.zeros_like(self.L0acts)
+        self.theta=theta       
         self.moving_avg_rate=moving_avg_rate
-        self.corrmatrix_ave = np.zeros((nunits,nunits))
+        self.initialize_stats()
         
         self._load_stims(data, datatype, stimshape, pca)
             
         self.Q = self.rand_dict()
+        
+    def initialize_stats(self):
+        nunits = self.nunits
+        self.corrmatrix_ave = np.zeros((nunits,nunits))
+        self.L0hist = np.array([])
+        self.L1hist = np.array([])
+        self.L2hist = np.array([])
+        self.L0acts = np.zeros(nunits)
+        self.L1acts = np.zeros(nunits)
+        self.L2acts = np.zeros(nunits)
+        self.errorhist = np.array([])
+        self.meanacts = np.zeros_like(self.L0acts)
         
     def _load_stims(self, data, datatype, stimshape, pca):
         if datatype == "image":
@@ -94,10 +100,6 @@ class DictLearner(object):
             
     def run(self, ntrials = 1000, batch_size = None, show=False, rate_decay=None, normalize = True):
         batch_size = batch_size or self.stims.batch_size
-        prevtrials = len(self.errorhist)
-        self.errorhist = np.concatenate((self.errorhist,np.zeros(ntrials)))
-        self.L0hist = np.concatenate((self.L0hist,np.zeros(ntrials)))
-        self.L1hist = np.concatenate((self.L1hist,np.zeros(ntrials)))
         for trial in range(ntrials):
             if trial % 50 == 0:
                 print (trial)
@@ -106,18 +108,7 @@ class DictLearner(object):
             acts,_,_ = self.infer(X)
             thiserror = self.learn(X, acts, normalize)
             
-            # store statistics
-            self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
-            L0means = np.mean(acts != 0, axis=1)
-            self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
-            means = acts.mean(1)
-            self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*means
-            self.errorhist[trial + prevtrials] = thiserror
-            self.L0hist[trial + prevtrials] = np.mean(acts!=0)
-            self.L1hist[trial + prevtrials] = np.mean(np.abs(acts))
-            actdevs = acts-means[:,np.newaxis]
-            corrmatrix = (actdevs).dot(actdevs.T)/batch_size
-            self.corrmatrix_ave = (1-self.moving_avg_rate)*self.corrmatrix_ave + self.moving_avg_rate*corrmatrix
+            self._store_statistics(acts, thiserror, batch_size)
             
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
                 try: 
@@ -130,7 +121,28 @@ class DictLearner(object):
         if show:
             plt.figure()
             plt.plot(self.errorhist)
-            plt.show()         
+            plt.show()        
+            
+    def _store_statistics(self, acts, thiserror, batch_size=None, center_corr=True):
+        batch_size = batch_size or self.batch_size
+        self.L2acts = (1-self.moving_avg_rate)*self.L2acts + self.moving_avg_rate*(acts**2).mean(1)
+        self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
+        L0means = np.mean(acts != 0, axis=1)
+        self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
+        means = acts.mean(1)
+        self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*means
+        self.errorhist = np.append(self.errorhist, thiserror)
+        self.L0hist = np.append(self.L0hist, np.mean(acts!=0))
+        self.L1hist = np.append(self.L1hist, np.mean(np.abs(acts)))
+        self.L2hist = np.append(self.L2hist, np.mean(acts**2))
+        if center_corr:
+            actdevs = acts-means[:,np.newaxis]
+            corrmatrix = (actdevs).dot(actdevs.T)/batch_size
+        else:
+            corrmatrix = acts.dot(acts.T)/self.batch_size
+        self.corrmatrix_ave = (1-self.moving_avg_rate)*self.corrmatrix_ave + self.moving_avg_rate*corrmatrix
+        return corrmatrix
+        
     
     def show_dict(self, stimset=None, cmap='jet', subset=None, square=False, savestr=None):
         """Plot an array of tiled dictionary elements. The 0th element is in the top right."""
@@ -159,8 +171,7 @@ class DictLearner(object):
             plt.colorbar()
         if savestr is not None:
             plt.savefig(savestr, bbox_inches='tight')
-       
-        
+               
     def rand_dict(self):
         Q = np.random.randn(self.nunits, self.stims.datasize)
         return (np.diag(1/np.sqrt(np.sum(Q**2,1)))).dot(Q)
@@ -189,20 +200,69 @@ class DictLearner(object):
             plt.ylabel(kwargs.ylabel)
         except:
             pass
+        
+    def sort_dict(self, batch_size=None, plot = False, allstims = True, savestr=None):
+        """Sorts the RFs in order by their usage on a batch. Default batch size
+        is 10 times the stored batch size. Usage means 1 for each stimulus for
+        which the element was used and 0 for the other stimuli, averaged over 
+        stimuli."""
+        if allstims:
+            testX = self.stims.data.T
+        else:
+            batch_size = batch_size or 10*self.batch_size
+            testX = self.stims.rand_stim(batch_size)
+        means = np.mean(self.infer(testX)[0] != 0, axis=1)
+        sorter = np.argsort(means)
+        self.sort(means, sorter, plot, savestr)
+        return means[sorter]
+        
+    def fast_sort(self, L1=False, plot=False, savestr=None):
+        """Sorts RFs in order by moving average usage."""
+        if L1:
+            usages = self.L1acts
+        else:
+            usages = self.L0acts
+        sorter = np.argsort(usages)
+        self.sort(usages, sorter, plot, savestr)
+        return usages[sorter]
+    
+    def sort(self, usages, sorter, plot=False, savestr=None):
+        self.Q = self.Q[sorter]
+        self.L0acts = self.L0acts[sorter]
+        self.L1acts = self.L1acts[sorter]
+        self.L2acts = self.L2acts[sorter]
+        self.corrmatrix_ave = self.corrmatrix_ave[sorter, sorter]
+        if plot:
+            plt.figure()
+            plt.plot(usages[sorter])
+            plt.title('L0 Usage')
+            plt.xlabel('Dictionary index')
+            plt.ylabel('Fraction of stimuli')
+            if savestr is not None:
+                plt.savefig(savestr,format='png', bbox_inches='tight')
                 
-    def load_params(self, filename=None):
+    def load(self, filename=None):
         if filename is None:
             filename = self.paramfile
         self.paramfile = filename
         with open(filename, 'rb') as f:
-            self.Q, self.errorhist = pickle.load(f)
-        self.picklefile = filename
+            self.Q, params, histories = pickle.load(f)
+        (self.learnrate, self.theta, self.min_thresh, self.infrate, 
+                  self.niter, self.adapt, self.max_iter, self.tolerance) = params
+        (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
+                     self.L1acts, self.L1hist, self.L2hist, self.L2acts,
+                     self.corrmatrix_ave) = histories
         
-    def save_params(self, filename=None):
+    def save(self, filename=None):
         filename = filename or self.paramfile
         if filename is None:
             raise ValueError("You need to input a filename.")
-        self.paramfile = filename        
+        self.paramfile = filename
+        params = (self.learnrate, self.theta, self.min_thresh, self.infrate, 
+                  self.niter, self.adapt, self.max_iter, self.tolerance)
+        histories = (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
+                     self.L1acts, self.L1hist, self.L2hist, self.L2acts,
+                     self.corrmatrix_ave)
         with open(filename, 'wb') as f:
-            pickle.dump([self.Q, self.errorhist], f)
+            pickle.dump([self.Q, params, histories], f)
                

@@ -37,7 +37,7 @@ class LCALearner(DictLearner):
             batch_size: number of data presented for inference per learning step
             infrate: rate for evolving the dynamical equation in inference (size of each step)
             niter: number of steps in inference (if tolerance is small, chunks of this many iterations are repeated until tolerance is satisfied)
-            min_thresh: thresholds are reduced during inference no lower than this value. sometimes called lambda, multiplies sparsity constaint in objective function
+            min_thresh: thresholds are reduced during inference no lower than this value. sometimes called lambda, multiplies sparsity constraint in objective function
             adapt: factor by which thresholds are multipled after each inference step
             tolerance: inference ceases after mean-squared error falls below tolerance
             max_iter: maximum number of chunks of inference (each chunk having niter iterations)
@@ -161,83 +161,38 @@ class LCALearner(DictLearner):
         self.niter = temp
         print("Final SNR: " + str(self.snr(X,s)))
         return s
-                  
-    def sort_dict(self, batch_size=None, plot = False, allstims = True, savestr=None):
-        """Sorts the RFs in order by their usage on a batch. Default batch size
-        is 10 times the stored batch size. Usage means 1 for each stimulus for
-        which the element was used and 0 for the other stimuli, averaged over 
-        stimuli."""
-        if allstims:
-            testX = self.stims.data.T
-        else:
-            batch_size = batch_size or 10*self.batch_size
-            testX = self.stims.rand_stim(batch_size)
-        means = np.mean(self.infer(testX)[0] != 0, axis=1)
-        sorter = np.argsort(means)
-        self.sort(means, sorter, plot, savestr)
-        return means[sorter]
-        
-    def fast_sort(self, L1=False, plot=False, savestr=None):
-        """Sorts RFs in order by moving average usage."""
-        if L1:
-            usages = self.L1acts
-        else:
-            usages = self.L0acts
-        sorter = np.argsort(usages)
-        self.sort(usages, sorter, plot, savestr)
-        return usages[sorter]
-    
-    def sort(self, usages, sorter, plot=False, savestr=None):
-        self.Q = self.Q[sorter]
-        self.L0acts = self.L0acts[sorter]
-        self.L1acts = self.L1acts[sorter]
-        if plot:
-            plt.figure()
-            plt.plot(usages[sorter])
-            plt.title('L0 Usage')
-            plt.xlabel('Dictionary index')
-            plt.ylabel('Fraction of stimuli')
-            if savestr is not None:
-                plt.savefig(savestr,format='png', bbox_inches='tight')
         
     def adjust_rates(self, factor):
         """Multiply the learning rate by the given factor."""
         self.learnrate = factor*self.learnrate
         #self.infrate = self.infrate*factor # this is bad, but NC seems to have done it
         
-    def load_params(self, filename=None):
+    def load(self, filename=None):
         """Loads the parameters that were saved. For older files when I saved less, loads what I saved then."""
         self.paramfile = filename
         try:
-            with open(filename, 'rb') as f:
-                self.Q, params, histories = pickle.load(f)                
-            self.learnrate, self.theta, self.min_thresh, self.infrate, self.niter, self.adapt, self.max_iter, self.tolerance = params
+            super().load(filename)
+            return
+        except:
+            # This is all for backwards-compatibility with files I saved before I started saving as many statistics
             try:
-                self.errorhist, self.L0acts, self.L0hist, self.L1acts, self.L1hist, self.corrmatrix_ave = histories
-            except ValueError:
-                print('Loading old file. Correlation matrix not available.')
+                with open(filename, 'rb') as f:
+                    self.Q, params, histories = pickle.load(f)                
+                self.learnrate, self.theta, self.min_thresh, self.infrate, self.niter, self.adapt, self.max_iter, self.tolerance = params
                 try:
-                    self.errorhist, self.L0acts, self.L0hist, self.L1acts, self.L1hist = histories
+                    self.errorhist, self.L0acts, self.L0hist, self.L1acts, self.L1hist, self.corrmatrix_ave = histories
                 except ValueError:
-                    print('Loading old file. Activity histories not available.')
+                    print('Loading old file. Correlation matrix not available.')
                     try:
-                        self.errorhist, self.L0acts, self.L1acts = histories
+                        self.errorhist, self.L0acts, self.L0hist, self.L1acts, self.L1hist = histories
                     except ValueError:
-                        print("Loading old file. Moving average activities not available.")
-                        self.errorhist = histories
-        except ValueError:
-            print("Loading very old file. Only dictionary and error history available.")
-            with open(filename, 'rb') as f:
-                self.Q, self.errorhist = pickle.load(f)
-        self.picklefile = filename
-        
-    def save_params(self, filename=None, dialog=False):
-        filename = filename or self.paramfile
-        if filename is None:
-            raise ValueError("You need to input a filename.")
-        self.paramfile = filename        
-        params = (self.learnrate, self.theta, self.min_thresh, self.infrate, 
-                  self.niter, self.adapt, self.max_iter, self.tolerance)
-        histories = (self.errorhist,self.L0acts, self.L0hist, self.L1acts, self.L1hist, self.corrmatrix_ave)
-        with open(filename, 'wb') as f:
-            pickle.dump([self.Q, params, histories], f)
+                        print('Loading old file. Activity histories not available.')
+                        try:
+                            self.errorhist, self.L0acts, self.L1acts = histories
+                        except ValueError:
+                            print("Loading old file. Moving average activities not available.")
+                            self.errorhist = histories
+            except ValueError:
+                print("Loading very old file. Only dictionary and error history available.")
+                with open(filename, 'rb') as f:
+                    self.Q, self.errorhist = pickle.load(f)
