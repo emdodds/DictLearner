@@ -20,7 +20,7 @@ except ImportError:
 class LCALearner(DictLearner):
     
     def __init__(self, data, nunits, learnrate=None, theta = 0.022,
-                 batch_size = 100, infrate=.003, #.0005 in Nicole's notes
+                 batch_size = 100, infrate=.01,
                  niter=300, min_thresh=0.4, adapt=0.95, tolerance = .01, max_iter=4,
                  softthresh = False, datatype = "image", moving_avg_rate=.001,
                  pca = None, stimshape = None, paramfile = None, gpu=False):
