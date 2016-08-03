@@ -59,3 +59,18 @@ class Sparsenet(DictLearner.DictLearner):
         self.gains = self.gains*newgains**self.gain_rate
         self.Q = self.gains[:,np.newaxis]*self.Q
         return mse
+        
+    def sort(self, usages, sorter, plot=False, savestr=None):
+        self.gains = self.gains[sorter]
+        self.variances = self.variances[sorter]
+        super().sort(usages, sorter, plot, savestr)
+        
+    def set_params(self, params):
+        (self.learnrate, self.infrate, self.niter, self.lamb,
+             self.measure, self.var_goal, self.gains, self.variances,
+             self.var_eta, self.gain_rate) = params
+             
+    def get_param_list(self):
+        return (self.learnrate, self.infrate, self.niter, self.lamb,
+             self.measure, self.var_goal, self.gains, self.variances,
+             self.var_eta, self.gain_rate)

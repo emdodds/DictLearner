@@ -167,6 +167,14 @@ class LCALearner(DictLearner):
         self.learnrate = factor*self.learnrate
         #self.infrate = self.infrate*factor # this is bad, but NC seems to have done it
         
+    def set_params(self, params):
+        (self.learnrate, self.theta, self.min_thresh, self.infrate, 
+                self.niter, self.adapt, self.max_iter, self.tolerance) = params
+        
+    def get_param_list(self):
+        return (self.learnrate, self.theta, self.min_thresh, self.infrate, 
+                  self.niter, self.adapt, self.max_iter, self.tolerance)
+        
     def load(self, filename=None):
         """Loads the parameters that were saved. For older files when I saved less, loads what I saved then."""
         self.paramfile = filename

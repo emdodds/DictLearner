@@ -231,6 +231,7 @@ class DictLearner(object):
         self.L0acts = self.L0acts[sorter]
         self.L1acts = self.L1acts[sorter]
         self.L2acts = self.L2acts[sorter]
+        self.meanacts = self.meanacts[sorter]
         self.corrmatrix_ave = self.corrmatrix_ave[sorter, sorter]
         if plot:
             plt.figure()
@@ -247,19 +248,23 @@ class DictLearner(object):
         self.paramfile = filename
         with open(filename, 'rb') as f:
             self.Q, params, histories = pickle.load(f)
-        (self.learnrate, self.theta, self.min_thresh, self.infrate, 
-                  self.niter, self.adapt, self.max_iter, self.tolerance) = params
         (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
                      self.L1acts, self.L1hist, self.L2hist, self.L2acts,
                      self.corrmatrix_ave) = histories
+        self.set_params(params)
+        
+    def set_params(self, params):
+        raise NotImplementedError
+        
+    def get_param_list(self):
+        raise NotImplementedError
         
     def save(self, filename=None):
         filename = filename or self.paramfile
         if filename is None:
             raise ValueError("You need to input a filename.")
         self.paramfile = filename
-        params = (self.learnrate, self.theta, self.min_thresh, self.infrate, 
-                  self.niter, self.adapt, self.max_iter, self.tolerance)
+        params = self.get_param_list()
         histories = (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
                      self.L1acts, self.L1hist, self.L2hist, self.L2acts,
                      self.corrmatrix_ave)

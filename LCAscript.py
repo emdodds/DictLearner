@@ -30,7 +30,7 @@ numunits = int(oc*numinput)
 
 with open(datafile+'_pca.pickle', 'rb') as f:
     mypca, origshape = pickle.load(f)
-data = np.load(datafile+'.npy')*200
+data = np.load(datafile+'.npy')*283
 
 lca = LCALearner.LCALearner(data, numunits, datatype="spectro", pca = mypca,  stimshape=origshape, paramfile='dummy')
 
