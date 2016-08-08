@@ -52,10 +52,12 @@ elif data == 'spectros':
 
 net.niter = niter
 net.lamb = lam
-net.learnrate = 0.001
+net.learnrate = 0.0005
+net.gain_rate = 0.001
 
 savestr = resultsfolder+'SN'+str(oc)+'OC' + str(lam) + datasuffix
 net.save(savestr+'.pickle')
-net.run(ntrials=100000)
+net.run(ntrials=50000)
 net.learnrate = net.learnrate/5
+net.run(50000)
 net.save()

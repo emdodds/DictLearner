@@ -45,7 +45,7 @@ class Sparsenet(DictLearner.DictLearner):
         QX = self.Q.dot(X)
         for k in range(self.niter):    
             da_dt = QX - phi_sq.dot(acts) - self.lamb*self.dSda(acts)
-            acts=(1-self.infrate)*acts+self.infrate*(da_dt)
+            acts = acts+self.infrate*(da_dt)
             
             if infplot:
                 costY1[k]=np.mean((X.T-np.dot(acts.T,self.Q))**2) 

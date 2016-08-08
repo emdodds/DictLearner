@@ -8,40 +8,56 @@ import argparse
 import pickle
 import LCALearner
 import numpy as np
+import scipy.io as io
 
 parser = argparse.ArgumentParser(description="Learn dictionaries for LCA with given parameters.")
 parser.add_argument('-o', '--overcompleteness', default=4, type=float)
-parser.add_argument('-d', '--datafile', default='../audition/Data/speech_ptwisecut', type=str)
+parser.add_argument('-d', '--data', default='images', type=str)
+#parser.add_argument('-d', '--datafile', default='../audition/Data/speech_ptwisecut', type=str)
 parser.add_argument('-r', '--resultsfolder', default='../audition/Results/',type=str)
-parser.add_argument('-s', '--datasuffix', default='ptwise', type=str)
+parser.add_argument('-s', '--savesuffix', default='', type=str)
 parser.add_argument('-i', '--niter', default=200, type=int)
 parser.add_argument('-l', '--lam', default=0.6, type=float)
 args=parser.parse_args()
 
-datafile = args.datafile
+#datafile = args.datafile
+data = args.data
 resultsfolder = args.resultsfolder
 oc = args.overcompleteness
-datasuffix = args.datasuffix
+savesuffix = args.savesuffix
 niter = args.niter
 lam = args.lam
 
-numinput = 200
-numunits = int(oc*numinput)
+if data == 'images':
+    datafile = '../vision/Data/IMAGES.mat'
+    numinput = 256
+    numunits = int(oc*numinput)
+    data = io.loadmat(datafile)["IMAGES"]
+    if resultsfolder == '':
+        resultsfolder = '../vision/Results/'
+    lca = LCALearner.LCALearner(data, numunits, paramfile='dummy')
+elif data == 'spectros':
+    datafile = '../audition/Data/speech_ptwisecut'
+    numinput = 200
+    numunits = int(oc*numinput)
+    
+    with open(datafile+'_pca.pickle', 'rb') as f:
+        mypca, origshape = pickle.load(f)
+    data = np.load(datafile+'.npy')
+    data = data/data.std()
+    if resultsfolder == '':
+        resultsfolder = '../audition/Results/'       
+    lca = LCALearner.LCALearner(data, numunits, datatype="spectro", pca = mypca,  stimshape=origshape, paramfile='dummy')
 
-with open(datafile+'_pca.pickle', 'rb') as f:
-    mypca, origshape = pickle.load(f)
-data = np.load(datafile+'.npy')*283
-
-lca = LCALearner.LCALearner(data, numunits, datatype="spectro", pca = mypca,  stimshape=origshape, paramfile='dummy')
 
 lca.min_thresh = lam
 lca.max_iter = 1
 lca.niter = niter
 lca.infrate = 0.01
+lca.learnrate = 0.0005
 
-savestr = resultsfolder+str(oc)+'OC' + str(lam) + datasuffix
+savestr = resultsfolder+str(oc)+'OC' + str(lam) + savesuffix
 lca.save(savestr+'.pickle')
 lca.run(ntrials=50000)
 lca.run(ntrials=200000, rate_decay=.99995)
-lca.sort_dict()
 lca.save()
