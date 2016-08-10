@@ -17,7 +17,7 @@ parser.add_argument('-d', '--data', default='images', type=str)
 parser.add_argument('-r', '--resultsfolder', default='',type=str)
 parser.add_argument('-s', '--datasuffix', default='ptwise', type=str)
 parser.add_argument('-i', '--niter', default=200, type=int)
-parser.add_argument('-l', '--lam', default=0.6, type=float)
+parser.add_argument('-l', '--lam', default=0.15, type=float)
 args=parser.parse_args()
 
 data = args.data

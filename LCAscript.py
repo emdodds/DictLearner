@@ -20,7 +20,7 @@ parser.add_argument('-s', '--savesuffix', default='', type=str)
 parser.add_argument('-i', '--niter', default=200, type=int)
 parser.add_argument('-l', '--lam', default=0.6, type=float)
 parser.add_argument('--load', action='store_true')
-parser.add_argument('--pos', action='store_true')
+parser.add_argument('--pos', default = False, type=bool)
 args=parser.parse_args()
 
 #datafile = args.datafile

@@ -29,6 +29,7 @@ class DictLearner(object):
         self._load_stims(data, datatype, stimshape, pca)
             
         self.Q = self.rand_dict()
+        self.fastmode = False # if true, some stats are not updated to save time
         
     def initialize_stats(self):
         nunits = self.nunits
@@ -130,7 +131,7 @@ class DictLearner(object):
             acts,_,_ = self.infer(X)
             thiserror = self.learn(X, acts, normalize)
             
-            self._store_statistics(acts, thiserror, batch_size)
+            self.store_statistics(acts, thiserror, batch_size)
             
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
                 try: 
@@ -145,7 +146,7 @@ class DictLearner(object):
             plt.plot(self.errorhist)
             plt.show()        
             
-    def _store_statistics(self, acts, thiserror, batch_size=None, center_corr=True):
+    def store_statistics(self, acts, thiserror, batch_size=None, center_corr=True):
         batch_size = batch_size or self.batch_size
         self.L2acts = (1-self.moving_avg_rate)*self.L2acts + self.moving_avg_rate*(acts**2).mean(1)
         self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
@@ -157,6 +158,12 @@ class DictLearner(object):
         self.L0hist = np.append(self.L0hist, np.mean(acts!=0))
         self.L1hist = np.append(self.L1hist, np.mean(np.abs(acts)))
         self.L2hist = np.append(self.L2hist, np.mean(acts**2))
+        try:
+            if self.fastmode:
+                # skip computing the correlation matrix, which is relatively expensive
+                return
+        except:
+            pass
         if center_corr:
             actdevs = acts-means[:,np.newaxis]
             corrmatrix = (actdevs).dot(actdevs.T)/batch_size
