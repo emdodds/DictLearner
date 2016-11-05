@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(description="Learn dictionaries for LCA with gi
 parser.add_argument('-o', '--overcompleteness', default=4, type=float)
 parser.add_argument('-d', '--data', default='images', type=str)
 #parser.add_argument('-d', '--datafile', default='../audition/Data/speech_ptwisecut', type=str)
-parser.add_argument('-r', '--resultsfolder', default='../audition/Results/',type=str)
+parser.add_argument('-r', '--resultsfolder', default='',type=str)
 parser.add_argument('-s', '--savesuffix', default='', type=str)
 parser.add_argument('-i', '--niter', default=200, type=int)
 parser.add_argument('-l', '--lam', default=0.6, type=float)

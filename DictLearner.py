@@ -29,7 +29,6 @@ class DictLearner(object):
         self._load_stims(data, datatype, stimshape, pca)
             
         self.Q = self.rand_dict()
-        self.fastmode = False # if true, some stats are not updated to save time
         
     def initialize_stats(self):
         nunits = self.nunits
@@ -44,13 +43,16 @@ class DictLearner(object):
         self.meanacts = np.zeros_like(self.L0acts)
         
     def _load_stims(self, data, datatype, stimshape, pca):
-        if datatype == "image":
+        if datatype == "image" and pca is not None:
+            stimshape = stimshape or (16,16)
+            self.stims = StimSet.PCvecSet(data, stimshape, pca, self.batch_size)
+        elif datatype == "image":
             stimshape = stimshape or (16,16)
             self.stims = StimSet.ImageSet(data, batch_size = self.batch_size, buffer=20, stimshape = stimshape)
         elif datatype == "spectro" and pca is not None:
             if stimshape == None:
                 raise Exception("When using PC representations, you need to provide the shape of the original stimuli.")
-            self.stims = StimSet.PCvecSet(data, stimshape, pca, self.batch_size)
+            self.stims = StimSet.SpectroPCSet(data, stimshape, pca, self.batch_size)
         elif datatype == "waveform" and pca is not None:
             self.stims = StimSet.WaveformPCSet(data, stimshape, pca, self.batch_size)
         else:
@@ -121,16 +123,16 @@ class DictLearner(object):
             self.Q = normmatrix.dot(self.Q)
         return np.mean(R**2)
             
-    def run(self, ntrials = 1000, batch_size = None, show=False, rate_decay=None, normalize = True):
+    def run(self, ntrials = 1000, batch_size = None, rate_decay=None, normalize = True):
         batch_size = batch_size or self.stims.batch_size
         for trial in range(ntrials):
-            if trial % 50 == 0:
-                print (trial)
-                
             X = self.stims.rand_stim(batch_size=batch_size)
             acts,_,_ = self.infer(X)
             thiserror = self.learn(X, acts, normalize)
             
+            if trial % 50 == 0:
+                print (trial)
+                
             self.store_statistics(acts, thiserror, batch_size)
             
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
@@ -140,11 +142,7 @@ class DictLearner(object):
                 except (ValueError, TypeError) as er:
                     print ('Failed to save parameters. ', er)
             if rate_decay is not None:
-                self.adjust_rates(rate_decay)
-        if show:
-            plt.figure()
-            plt.plot(self.errorhist)
-            plt.show()        
+                self.adjust_rates(rate_decay)      
             
     def store_statistics(self, acts, thiserror, batch_size=None, center_corr=True):
         batch_size = batch_size or self.batch_size
@@ -158,12 +156,6 @@ class DictLearner(object):
         self.L0hist = np.append(self.L0hist, np.mean(acts!=0))
         self.L1hist = np.append(self.L1hist, np.mean(np.abs(acts)))
         self.L2hist = np.append(self.L2hist, np.mean(acts**2))
-        try:
-            if self.fastmode:
-                # skip computing the correlation matrix, which is relatively expensive
-                return
-        except:
-            pass
         if center_corr:
             actdevs = acts-means[:,np.newaxis]
             corrmatrix = (actdevs).dot(actdevs.T)/batch_size
@@ -173,7 +165,7 @@ class DictLearner(object):
         return corrmatrix
         
     
-    def show_dict(self, stimset=None, cmap='jet', subset=None, square=False, savestr=None):
+    def show_dict(self, stimset=None, cmap='jet', subset=None, layout='sqrt', savestr=None):
         """Plot an array of tiled dictionary elements. The 0th element is in the top right."""
         stimset = stimset or self.stims
         if subset is not None:
@@ -181,7 +173,7 @@ class DictLearner(object):
             Qs = self.Q[np.sort(indices)]
         else:
             Qs = self.Q
-        array = stimset.stimarray(Qs[::-1], square=square)
+        array = stimset.stimarray(Qs[::-1], layout=layout)
         plt.figure()        
         arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
         plt.axis('off')
@@ -261,7 +253,8 @@ class DictLearner(object):
         self.L1acts = self.L1acts[sorter]
         self.L2acts = self.L2acts[sorter]
         self.meanacts = self.meanacts[sorter]
-        self.corrmatrix_ave = self.corrmatrix_ave[sorter, sorter]
+        self.corrmatrix_ave = self.corrmatrix_ave[sorter]
+        self.corrmatrix_ave= self.corrmatrix_ave.T[sorter].T
         if plot:
             plt.figure()
             plt.plot(usages[sorter])
