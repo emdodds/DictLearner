@@ -18,13 +18,13 @@ parser.add_argument('-s', '--suffix', default='ptwise', type=str)
 parser.add_argument('-i', '--niter', default=200, type=int)
 parser.add_argument('-l', '--lam', default=0.15, type=float)
 parser.add_argument('-l2', '--lam2', default=0.01, type=float)
-parser.add_argument('--shape', default = (25,32), type=tuple)
+#parser.add_argument('--shape', default = (25,32), type=tuple)
 parser.add_argument('--sigma', default = 1, type=float)
 args=parser.parse_args()
 
 data = args.data
 resultsfolder = args.resultsfolder
-shape = args.shape
+shape = (25,32)#args.shape
 suffix = args.suffix
 niter = args.niter
 lam = args.lam
