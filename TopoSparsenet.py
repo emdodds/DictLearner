@@ -34,7 +34,7 @@ class TopoSparsenet(sparsenet.Sparsenet):
             acts2 = self.g @ acts**2
             da2_da1 = 2 * self.g @ acts
             acts2_terms = self.dSda(acts2) * da2_da1
-            da_dt = QX - phi_sq.dot(acts) - self.lamb*self.dSda(acts) - self.lamb_2*acts2_terms
+            da_dt = QX - phi_sq @ acts - self.lamb*self.dSda(acts) - self.lamb_2*acts2_terms
             acts = acts+self.infrate*(da_dt)
             if infplot:
                 error_hist[k] = np.mean((X.T-np.dot(acts.T,self.Q))**2) 
@@ -81,6 +81,30 @@ class TopoSparsenet(sparsenet.Sparsenet):
                 
         return g
         
+    def block_membership(self, i, j, width=5):
+        """This returns 1 if j is in the ith block, otherwise 0. Currently only
+        works for square dictionaries."""
+        
+        size = self.dict_shape[0]
+        if size != self.dict_shape[1]:
+            raise NotImplementedError
+        i = [i // size, i % size]
+        j = [j // size, j % size]
+    
+        if abs((i[0]%size)-(j[0]%size)) % (size-1) < width  and abs((i[1]%size)-(j[1]%size)) % (size-1) < width:
+            return 1
+        else:
+            return 0
+            
+    def set_blocks(self, width=5):
+        """Change the topography by making each second layer unit respond to
+        a square block of layer one with given width. g becomes binary."""
+        self.g = np.zeros_like(self.g)
+        size = self.dict_shape[0]
+        for i in range(size):
+            for j in range(size): 
+                self.g[i, j] = self.block_membership(i, j, width)
+        
     def show_dict(self, stimset=None, cmap='RdBu', subset=None, square=False, savestr=None):
         """Plot an array of tiled dictionary elements. The 0th element is in the top right."""
         stimset = stimset or self.stims
@@ -100,9 +124,14 @@ class TopoSparsenet(sparsenet.Sparsenet):
         return arrayplot
         
     def set_params(self, params):
-        (self.learnrate, self.infrate, self.niter, self.lamb, self.lamb_2,
-             self.measure, self.var_goal, self.gains, self.variances,
-             self.var_eta, self.gain_rate) = params
+        try:
+            (self.learnrate, self.infrate, self.niter, self.lamb, self.lamb_2,
+                 self.measure, self.var_goal, self.gains, self.variances,
+                 self.var_eta, self.gain_rate) = params
+        except ValueError:
+            (self.learnrate, self.infrate, self.niter, self.lamb,
+                 self.measure, self.var_goal, self.gains, self.variances,
+                 self.var_eta, self.gain_rate) = params
              
     def get_param_list(self):
         return (self.learnrate, self.infrate, self.niter, self.lamb, self.lamb_2,

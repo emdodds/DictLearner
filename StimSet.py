@@ -172,7 +172,7 @@ class SpectroPCSet(PCvecSet):
             plt.savefig(savestr, bbox_inches='tight')
         plt.show()
         
-    def show_set(self, stims, cmap='RbBu', layout=(4,5), savestr=None):
+    def show_set(self, stims, cmap='RdBu', layout=(4,5), savestr=None):
         """
         Parameters:
         stims : (number of stim, flattened stim length) stimuli to plot
@@ -190,8 +190,8 @@ class SpectroPCSet(PCvecSet):
                 if savestr is not None:
                     plt.savefig(savestr+str(int(ii/per_figure)), bbox_inches='tight')
                 plt.figure()
-            plt.subplot(4,5,(ii % per_figure)+1)
-            plt.imshow(self.stim_for_display(stims[ii]),interpolation='nearest',
+            plt.subplot(layout[0],layout[1],(ii % per_figure)+1)
+            plt.imshow(self.stim_for_display(stims[ii]).T,interpolation='nearest',
                        cmap=cmap,aspect='auto', origin='lower')
             if ii % per_figure == per_figure - layout[1]:
                 # label axes for bottom left example
@@ -200,9 +200,12 @@ class SpectroPCSet(PCvecSet):
                 middlef = str(int(self.freqs[len(self.freqs)/2]))
                 middlet = str(int(self.tbin_width*(tlength+1)/2))
                 endtime = (tlength + 2)*self.tbin_width
-                plt.xticks([0, int(tlength/2)+1, self.tlength-1], ['0', middlet, endtime])
+                plt.xticks([0, int(tlength/2)+1, tlength-1], ['0', middlet, endtime])
                 plt.yticks([0,int(nfreqs/2),nfreqs-1],
-                    [str(self.freqs[0])+' Hz', middlef+' Hz', str(int(self.freqs[-1]/1000))+ ' kHz'])
+                    [str(int(self.freqs[0]))+' Hz', middlef+' Hz', str(int(self.freqs[-1]/1000))+ ' kHz'])
+            else:
+                plt.gca().get_yaxis().set_visible(False)
+                plt.gca().get_xaxis().set_visible(False)
         if savestr is not None:
             plt.savefig(savestr, bbox_inches='tight')
         plt.show()

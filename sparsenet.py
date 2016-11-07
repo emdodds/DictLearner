@@ -17,7 +17,7 @@ class Sparsenet(DictLearner.DictLearner):
                  var_eta=0.1, **kwargs):
         self.niter=niter
         self.lamb = lamb
-        self.infrate=0.01
+        self.infrate=infrate
         self.measure = measure
         self.var_goal = var_goal
         self.gains = np.ones(nunits)
