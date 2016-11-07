@@ -91,7 +91,7 @@ class TopoSparsenet(sparsenet.Sparsenet):
         i = [i // size, i % size]
         j = [j // size, j % size]
     
-        if abs((i[0]%size)-(j[0]%size)) % (size-1) < width  and abs((i[1]%size)-(j[1]%size)) % (size-1) < width:
+        if (abs((i[0]%size)-(j[0]%size)) % (size-1) < width)  and (abs((i[1]%size)-(j[1]%size)) % (size-1) < width):
             return 1
         else:
             return 0
@@ -100,9 +100,9 @@ class TopoSparsenet(sparsenet.Sparsenet):
         """Change the topography by making each second layer unit respond to
         a square block of layer one with given width. g becomes binary."""
         self.g = np.zeros_like(self.g)
-        size = self.dict_shape[0]
-        for i in range(size):
-            for j in range(size): 
+        nunits = np.prod(self.dict_shape)
+        for i in range(nunits):
+            for j in range(nunits): 
                 self.g[i, j] = self.block_membership(i, j, width)
         
     def show_dict(self, stimset=None, cmap='RdBu', subset=None, square=False, savestr=None):
