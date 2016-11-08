@@ -75,16 +75,18 @@ class TopoSparsenet(sparsenet.Sparsenet):
     
         g = np.zeros((self.nunits, self.nunits))
         
+        sigsquared = self.sigma**2
         for i in range(self.nunits):
             for j in range(self.nunits):              
-                g[i, j] = np.exp(-self.distance(i, j)/(2. * self.sigma**2))
+                g[i, j] = np.exp(-self.distance(i, j)/(2 * sigsquared))
                 
         return g
         
     def block_membership(self, i, j, width=5):
         """This returns 1 if j is in the ith block, otherwise 0. Currently only
         works for square dictionaries."""
-        
+        # TODO: I think there's a bug here that makes the boundary conditions
+        # and the sizes wrong
         size = self.dict_shape[0]
         if size != self.dict_shape[1]:
             raise NotImplementedError
@@ -104,6 +106,11 @@ class TopoSparsenet(sparsenet.Sparsenet):
         for i in range(nunits):
             for j in range(nunits): 
                 self.g[i, j] = self.block_membership(i, j, width)
+                
+    def binarize_g(self, thresh=1/2, width=None):
+        if width is not None:
+            thresh = np.exp(-width**2/(2*self.sigma**2))
+        self.g = np.array(self.g >= thresh, dtype=int)
         
     def show_dict(self, stimset=None, cmap='RdBu', subset=None, square=False, savestr=None):
         """Plot an array of tiled dictionary elements. The 0th element is in the top right."""

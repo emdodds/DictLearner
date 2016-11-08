@@ -62,7 +62,7 @@ net.lamb_2 = lam2
 net.learnrate = 0.0005
 
 
-savestr = resultsfolder+'SN'+str(shape[0])+'x'+str(shape[1]) +  suffix
+savestr = resultsfolder+'TSN'+str(shape[0])+'x'+str(shape[1]) + 's'+str(sigma)+ suffix
 net.save(savestr+'.pickle')
 net.run(ntrials=10000)
 net.save()

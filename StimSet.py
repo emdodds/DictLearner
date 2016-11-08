@@ -186,7 +186,7 @@ class SpectroPCSet(PCvecSet):
         nstim = stims.shape[0]
         
         for ii in range(nstim):
-            if ii%20==0 and ii>0:
+            if ii%per_figure==0 and ii>0:
                 if savestr is not None:
                     plt.savefig(savestr+str(int(ii/per_figure)), bbox_inches='tight')
                 plt.figure()
