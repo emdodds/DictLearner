@@ -17,9 +17,10 @@ parser.add_argument('-r', '--resultsfolder', default='',type=str)
 parser.add_argument('-s', '--suffix', default='ptwise', type=str)
 parser.add_argument('-i', '--niter', default=200, type=int)
 parser.add_argument('-l', '--lam', default=0.15, type=float)
-parser.add_argument('-l2', '--lam2', default=0.01, type=float)
+parser.add_argument('-l2', '--lam2', default=0.05, type=float)
 #parser.add_argument('--shape', default = (25,32), type=tuple)
 parser.add_argument('--sigma', default = 1, type=float)
+parser.add_argument('--binarize', action='store_true')
 args=parser.parse_args()
 
 data = args.data
@@ -30,6 +31,7 @@ niter = args.niter
 lam = args.lam
 lam2 = args.lam2
 sigma = args.sigma
+binarize = args.binarize
 
 if data == 'images':
     datafile = '../vision/Data/IMAGES.mat'
@@ -61,6 +63,8 @@ net.lamb = lam
 net.lamb_2 = lam2
 net.learnrate = 0.0005
 
+if binarize:
+    net.binarize_g()
 
 savestr = resultsfolder+'TSN'+str(shape[0])+'x'+str(shape[1]) + 's'+str(sigma)+ suffix
 net.save(savestr+'.pickle')
