@@ -185,9 +185,12 @@ class SpectroPCSet(PCvecSet):
         per_figure = np.prod(layout)
         nstim = stims.shape[0]
         
+        plt.figure()
         for ii in range(nstim):
             if ii%per_figure==0 and ii>0:
                 if savestr is not None:
+                    plt.tight_layout()
+                    plt.subplots_adjust(wspace=.05, hspace=.05)
                     plt.savefig(savestr+str(int(ii/per_figure)), bbox_inches='tight')
                 plt.figure()
             plt.subplot(layout[0],layout[1],(ii % per_figure)+1)
@@ -196,16 +199,19 @@ class SpectroPCSet(PCvecSet):
             if ii % per_figure == per_figure - layout[1]:
                 # label axes for bottom left example
                 plt.ylabel('Frequency')
-                plt.xlabel('Time (ms, bin = '+str(self.tbin_width)+' ms)')
+                plt.xlabel('Time (ms, bin = '+str(self.tbin_width/2)+' ms)')
                 middlef = str(int(self.freqs[len(self.freqs)/2]))
-                middlet = str(int(self.tbin_width*(tlength+1)/2))
-                endtime = (tlength + 2)*self.tbin_width
+                middlet = str(int(self.tbin_width/2*(tlength+1)/2))
+                endtime = str(int((tlength + 2)*self.tbin_width/2))
                 plt.xticks([0, int(tlength/2)+1, tlength-1], ['0', middlet, endtime])
                 plt.yticks([0,int(nfreqs/2),nfreqs-1],
                     [str(int(self.freqs[0]))+' Hz', middlef+' Hz', str(int(self.freqs[-1]/1000))+ ' kHz'])
             else:
                 plt.gca().get_yaxis().set_visible(False)
                 plt.gca().get_xaxis().set_visible(False)
+                
+        plt.tight_layout()
+        plt.subplots_adjust(wspace=.05, hspace=.05)
         if savestr is not None:
             plt.savefig(savestr, bbox_inches='tight')
         plt.show()

@@ -31,21 +31,28 @@ class TopoSparsenet(sparsenet.Sparsenet):
         phi_sq = self.Q.dot(self.Q.T)
         QX = self.Q.dot(X)
         for k in range(self.niter):    
-            acts2 = self.g @ acts**2
-            da2_da1 = 2 * self.g @ acts
-            acts2_terms = self.dSda(acts2) * da2_da1
-            da_dt = QX - phi_sq @ acts - self.lamb*self.dSda(acts) - self.lamb_2*acts2_terms
+            pooled = self.g @ acts**2
+            da2_da1 = 2 * self.layer_two_deriv(pooled) * (self.g @ acts)
+            da_dt = QX - phi_sq @ acts - self.lamb*self.dSda(acts) - self.lamb_2*da2_da1
             acts = acts+self.infrate*(da_dt)
             if infplot:
                 error_hist[k] = np.mean((X.T-np.dot(acts.T,self.Q))**2) 
                 first_hist[k] = np.mean(np.abs(acts))
-                second_hist[k] = np.mean(acts2)
+                second_hist[k] = np.mean(self.layer_two_measure(pooled))
         if infplot:
             plt.figure()
             plt.plot(error_hist,'b')
             plt.plot(first_hist,'g')
             plt.plot(second_hist, 'r')
         return acts, None, None
+        
+    def layer_two_measure(self, pooled_acts):
+        """For now, just takes the square root."""
+        return np.sqrt(pooled_acts)
+        
+    def layer_two_deriv(self, pooled_acts):
+        return 1/(2*np.sqrt(pooled_acts) + 0.01)
+        
         
     def distance(self, i, j):
         """ This function measures the distance between element i and j. The distance 
