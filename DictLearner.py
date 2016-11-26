@@ -165,7 +165,7 @@ class DictLearner(object):
         return corrmatrix
         
     
-    def show_dict(self, stimset=None, cmap='jet', subset=None, layout='sqrt', savestr=None):
+    def show_dict(self, stimset=None, cmap='RdBu', subset=None, layout='sqrt', savestr=None):
         """Plot an array of tiled dictionary elements. The 0th element is in the top right."""
         stimset = stimset or self.stims
         if subset is not None:
@@ -270,9 +270,7 @@ class DictLearner(object):
         self.paramfile = filename
         with open(filename, 'rb') as f:
             self.Q, params, histories = pickle.load(f)
-        (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
-                     self.L1acts, self.L1hist, self.L2hist, self.L2acts,
-                     self.corrmatrix_ave) = histories
+        self.set_histories(histories)
         self.set_params(params)
         
     def set_params(self, params):
@@ -287,9 +285,17 @@ class DictLearner(object):
             raise ValueError("You need to input a filename.")
         self.paramfile = filename
         params = self.get_param_list()
-        histories = (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
-                     self.L1acts, self.L1hist, self.L2hist, self.L2acts,
-                     self.corrmatrix_ave)
+        histories = self.get_histories()
         with open(filename, 'wb') as f:
             pickle.dump([self.Q, params, histories], f)
+
+    def get_histories(self):
+        return (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
+                     self.L1acts, self.L1hist, self.L2hist, self.L2acts,
+                     self.corrmatrix_ave)
+
+    def set_histories(self):
+        (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
+                     self.L1acts, self.L1hist, self.L2hist, self.L2acts,
+                     self.corrmatrix_ave) = histories
                
