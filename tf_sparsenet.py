@@ -34,21 +34,6 @@ class Sparsenet(sparsenet.Sparsenet):
 				print('Unexpected parameter passed:' + key)
 			setattr(self, key, val)
 
-		# TODO: is this really the smartest way to handle this?
-		self.params = {'nunits' : self.nunits,
-		'batch_size' : self.batch_size,
-		'paramfile' : self.paramfile,
-		'lam' : self.lam,
-		'niter' : self.niter,
-		'var_goal' : self.var_goal,
-		'var_avg_rate' : self.var_avg_rate,
-		'gain_rate' : self.gain_rate,
-		'infrate' : self.infrate,
-		'learnrate' : self.learnrate}
-
-		self.infrate = tf.Variable(self.infrate, trainable=False)
-		self.learnrate = tf.Variable(self.learnrate, trainable=False)
-
 		self._load_stims(data, datatype, self.stimshape, pca)
 		self.initialize_graph()
 		self.initialize_stats()
@@ -64,6 +49,9 @@ class Sparsenet(sparsenet.Sparsenet):
 		self.L1_history = np.append(self.L1_history, meanL1_value/self.nunits)
 
 	def initialize_graph(self):
+		self.infrate = tf.Variable(self.infrate, trainable=False)
+		self.learnrate = tf.Variable(self.learnrate, trainable=False)
+
 		self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
 		self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
 
@@ -188,16 +176,29 @@ class Sparsenet(sparsenet.Sparsenet):
 		raise NotImplementedError
 
 	def get_param_list(self):
-		return self.params
+		return {'nunits' : self.nunits,
+		'batch_size' : self.batch_size,
+		'paramfile' : self.paramfile,
+		'lam' : self.lam,
+		'niter' : self.niter,
+		'var_goal' : self.var_goal,
+		'var_avg_rate' : self.var_avg_rate,
+		'gain_rate' : self.gain_rate,
+		'infrate' : self.infrate,
+		'learnrate' : self.learnrate}
 
 	def set_params(self, params):
-		self.params = params
 		for key, val in params.items():
-			try:
-				getattr(self,key)
-			except AttributeError:
-				print('Unexpected parameter passed: ' + key)
-			setattr(self, key, val)
+			if key == 'infrate':
+				self.sess.run(self.infrate.assign(val))
+			elif key == 'learnrate':
+				self.sess.run(self.learnrate.assign(val))
+			else:
+				try:
+					getattr(self,key)
+				except AttributeError:
+					print('Unexpected parameter passed: ' + key)
+				setattr(self, key, val)
 
 	def get_histories(self):
 		return {'loss' : self.loss_history,
@@ -211,5 +212,9 @@ class Sparsenet(sparsenet.Sparsenet):
 
 	@property
 	def Q(self):
-		"""Q is just a different notation for the dictionary. Used for compatability with DictLearner."""
+		"""Q is just a different notation for the dictionary. Used for compatability with DictLearner methods."""
 		return self.sess.run(self.phi)
+
+	@Q.setter
+	def Q(self, value):
+		self.sess.run(self.phi.assign(value))

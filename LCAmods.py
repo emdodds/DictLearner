@@ -235,3 +235,111 @@ class PositiveLCA(LCALearner.LCALearner):
             plt.plot(allerrors)
             return s.T, errors
         return s.T, u.T, thresh
+        
+        
+class LocalLCA(LCALearner.LCALearner):
+    
+    def __init__(self, data, nunits, learnrate=None, theta = 0.022,
+                 batch_size = 100, infrate=.01,
+                 niter=300, min_thresh=0.4, adapt=0.95, tolerance = .01, max_iter=4,
+                 softthresh = False, datatype = "image", moving_avg_rate=.001,
+                 pca = None, stimshape = None, paramfile = None, gpu=False,
+                 estim_rate=0.05):
+        self.estim_rate = estim_rate
+        self.W = np.zeros((nunits, nunits))
+        super().__init__(data, nunits, learnrate, theta,
+                 batch_size, infrate,
+                 niter, min_thresh, adapt, tolerance, max_iter,
+                 softthresh, datatype, moving_avg_rate,
+                 pca, stimshape, paramfile, gpu)
+                 
+    def infer(self, X, infplot=False, tolerance=None, max_iter=None, use_dots=False):
+        tolerance = tolerance or self.tolerance
+        max_iter = max_iter or self.max_iter
+        ndict = self.Q.shape[0]
+               
+        nstim = X.shape[-1]
+        u = np.zeros((nstim, ndict))
+        s = np.zeros_like(u)
+        ci = np.zeros_like(u)
+        
+        if use_dots:
+            # W is the overlap of dictionary elements with each other, minus identity (i.e., ignore self-overlap)
+            W = self.Q.dot(self.Q.T)
+            for i in range(W.shape[0]):
+                W[i,i] = 0
+        else:
+            W = self.W
+            
+        # b[i,j] is overlap of stimulus i with dictionary element j
+        b = (self.Q.dot(X)).T
+
+        # initialize threshold values, one for each stimulus, based on average response magnitude
+        thresh = np.absolute(b).mean(1) 
+        thresh = np.array([np.max([th, self.min_thresh]) for th in thresh])
+        
+        if infplot:
+            errors = np.zeros(self.niter)
+            allerrors = np.array([])
+        
+        error = tolerance+1
+        outer_k = 0
+        while(error>tolerance and ((max_iter is None) or outer_k<max_iter)):
+            for kk in range(self.niter):
+                # ci is the competition term in the dynamical equation
+                ci[:] = s.dot(W)
+                u[:] = self.infrate*(b-ci) + (1.-self.infrate)*u
+                if np.max(np.isnan(u)):
+                    raise ValueError("Internal variable blew up at iteration " + str(kk))
+                if self.softthresh:
+                    s[:] = np.sign(u)*np.maximum(0.,np.absolute(u)-thresh[:,np.newaxis]) 
+                else:
+                    s[:] = u
+                    s[np.absolute(s) < thresh[:,np.newaxis]] = 0
+                    
+                if infplot:
+                    errors[kk] = np.mean(self.compute_errors(s.T,X))
+                    
+                thresh = self.adapt*thresh
+                thresh[thresh<self.min_thresh] = self.min_thresh
+                
+            error = np.mean((X.T - s.dot(self.Q))**2)
+            outer_k = outer_k+1
+            if infplot:
+                allerrors = np.concatenate((allerrors,errors))
+        
+        if infplot:
+            plt.figure(3)
+            plt.clf()
+            plt.plot(allerrors)
+            return s.T, errors
+        return s.T, u.T, thresh
+        
+    def learn(self, data, coeffs, normalize=True):
+        R = data.T - np.dot(coeffs.T, self.Q)
+        # estimate receptive fields based on synaptically local data
+        RFs = coeffs @ data.T
+        norms = np.linalg.norm(RFs, axis=1)
+        norms[norms==0] = 1
+        RFs = RFs / norms[:,None]
+        coeffs_squared = coeffs @ coeffs.T
+        diag_squares = np.diag(np.diag(coeffs_squared))
+        approxterm = (coeffs_squared - diag_squares) @ RFs
+        dQ = coeffs @ data.T - self.Q - diag_squares.dot(self.Q) - approxterm
+        self.Q = self.Q + self.learnrate*dQ
+        if self.theta != 0:
+            # Notice this is calculated using the Q after the mse learning rule
+            thetaterm = (self.Q - np.dot(self.Q,np.dot(self.Q.T,self.Q)))
+            self.Q = self.Q + self.theta*thetaterm
+        if normalize:
+            # force dictionary elements to be normalized
+            normmatrix = np.diag(1./np.sqrt(np.sum(self.Q*self.Q,1))) 
+            self.Q = normmatrix.dot(self.Q)
+            
+        newW = self.Q @ RFs.T
+        
+        self.W = (1 - self.estim_rate)*self.W + self.estim_rate*newW
+        for ii in range(self.nunits):
+            self.W[ii,ii] = 0            
+            
+        return np.mean(R**2)
