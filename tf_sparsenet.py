@@ -111,7 +111,7 @@ class Sparsenet(sparsenet.Sparsenet):
         Qs = self.sess.run(self.phi)
         if subset is not None:
             indices = np.random.choice(self.nunits, subset)
-        Qs = Qs[np.sort(indices)]
+            Qs = Qs[np.sort(indices)]
         array = self.stims.stimarray(Qs[::-1], layout=layout)
         plt.figure()
         arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
