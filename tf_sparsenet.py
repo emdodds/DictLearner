@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import DictLearner
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import sparsenet
 
 class Sparsenet(sparsenet.Sparsenet):
-	"""A sparse dictionary learner based on (Olshausen and Field, 1996). Uses a tensorflow backend."""
-
+    """A sparse dictionary learner based on (Olshausen and Field, 1996). Uses a tensorflow backend."""
+    
     def __init__(self, data, datatype="image", pca=None, **kwargs):
         self.nunits = 200
         self.batch_size = 100
