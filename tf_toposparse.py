@@ -62,11 +62,13 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         _, self.variances = tf.nn.moments(self.acts, axes=[1])
         self.update_variance = self.ma_variances.assign((1.-self.var_avg_rate)*self.ma_variances + self.var_avg_rate*self.variances)
         self.update_gains = self.gains.assign(self.gains*tf.pow(self.var_goal/self.ma_variances, self.gain_rate))
-        self.renorm_phi = self.phi.assign((tf.expand_dims(self.gains,dim=1)*tf.nn.l2_normalize(self.phi, dim=1)))
+        self.renorm_phi = self.phi.assign((tf.expand_dims(self.gains,dim=1)*tf.nn.l2_normalize(self.phi, dim=1,epsilon=1e-15)))
         
-        self.sess = tf.Session()
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+        config = tf.ConfigProto(gpu_options=gpu_options)
+        self.sess = tf.Session(config=config)
         
-        self.sess.run(tf.initialize_all_variables())
+        self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1)))
 
     def distance(self, i, j):
@@ -134,7 +136,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
             thresh = np.exp(-width**2/(2*self.sigma**2))
             self.g = np.array(self.g >= thresh, dtype=int)
 
-    def show_dict(self, stimset=None, cmap='RdBu', subset=None, layout=None, savestr=None):
+    def show_dict(self, cmap='RdBu', subset=None, layout=None, savestr=None):
         layout = layout or self.dict_shape
         super().show_dict(stimset, cmap, subset, layout, savestr)
 
