@@ -294,7 +294,7 @@ class DictLearner(object):
                      self.L1acts, self.L1hist, self.L2hist, self.L2acts,
                      self.corrmatrix_ave)
 
-    def set_histories(self):
+    def set_histories(self, histories):
         (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
                      self.L1acts, self.L1hist, self.L2hist, self.L2acts,
                      self.corrmatrix_ave) = histories
