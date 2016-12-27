@@ -69,7 +69,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         self.sess = tf.Session(config=config)
         
         self.sess.run(tf.global_variables_initializer())
-        self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1)))
+        self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1, epsilon=1e-15)))
 
     def distance(self, i, j):
         """ This function measures the distance between element i and j. The distance 
@@ -138,7 +138,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
 
     def show_dict(self, cmap='RdBu', subset=None, layout=None, savestr=None):
         layout = layout or self.dict_shape
-        super().show_dict(stimset, cmap, subset, layout, savestr)
+        super().show_dict(cmap, subset, layout, savestr)
 
     def sort(self, *args, **kwargs):
         print("The topographic order is meaningful, don't sort it away!") 
