@@ -40,6 +40,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         
         self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
         self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
+        self.reset_acts = self.acts.assign(tf.zeros([self.nunits,self.batch_size]))
         
         self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
         self.Xhat = tf.matmul(tf.transpose(self.acts), self.phi)

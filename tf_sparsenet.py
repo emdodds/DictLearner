@@ -52,6 +52,7 @@ class Sparsenet(sparsenet.Sparsenet):
         
         self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
         self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
+        self.reset_acts = self.acts.assign(tf.zeros([self.nunits,self.batch_size]))
         
         self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
         self.Xhat = tf.matmul(tf.transpose(self.acts), self.phi)
@@ -77,12 +78,12 @@ class Sparsenet(sparsenet.Sparsenet):
         
         self.sess = tf.Session()
         
-        self.sess.run(tf.initialize_all_variables())
+        self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1)))
 
     def train_step(self):
         feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
-        self.sess.run(self.acts.assign(tf.zeros([self.nunits, self.batch_size])))
+        self.sess.run(self.reset_acts)
         for ii in range(self.niter):
             self.sess.run([self.inf_op, self.loss], feed_dict=feed_dict)
         
