@@ -175,6 +175,8 @@ class Sparsenet(sparsenet.Sparsenet):
         raise NotImplementedError
     
     def get_param_list(self):
+        lrnrate = self.sess.run(self.learnrate)
+        irate = self.sess.run(self.infrate)
         return {'nunits' : self.nunits,
         'batch_size' : self.batch_size,
         'paramfile' : self.paramfile,
@@ -183,8 +185,8 @@ class Sparsenet(sparsenet.Sparsenet):
         'var_goal' : self.var_goal,
         'var_avg_rate' : self.var_avg_rate,
         'gain_rate' : self.gain_rate,
-        'infrate' : self.infrate,
-        'learnrate' : self.learnrate}
+        'infrate' : irate,
+        'learnrate' : lrnrate}
 
     def set_params(self, params):
         for key, val in params.items():
@@ -201,8 +203,8 @@ class Sparsenet(sparsenet.Sparsenet):
 
     def get_histories(self):
         return {'loss' : self.loss_history,
-        'mse': self.mse_history,
-        'L1' : self.L1_history}
+                'mse': self.mse_history,
+                'L1' : self.L1_history}
     
     def set_histories(self, histories):
         self.loss_history = histories['loss']
