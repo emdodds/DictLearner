@@ -116,6 +116,7 @@ class ImageSet(StimSet):
                                   which]                     
             animage = animage.reshape(self.stimsize)
             # normalize image
+            # TODO: reconsider...
             animage = animage - np.mean(animage)
             X[:,i] = animage/animage.std()
         return X
@@ -157,14 +158,14 @@ class SpectroPCSet(PCvecSet):
             stim = -stim
         reshaped = self.stim_for_display(stim)
         tlength, nfreqs = self.stimshape
-        plt.imshow(reshaped, interpolation= 'nearest',
+        plt.imshow(reshaped.T, interpolation= 'nearest',
                    cmap=cmap, aspect='auto', origin='lower')
         plt.ylabel('Frequency')
         plt.xlabel('Time (ms, bin = '+str(self.tbin_width)+' ms)')
-        middlef = str(int(self.freqs[nfreqs/2]))
+        middlef = str(int(self.freqs[int(nfreqs/2)]))
         middlet = str(int(self.tbin_width*(tlength+1)/2))
         endtime = (tlength + 2)*self.tbin_width
-        plt.xticks([0, int(tlength/2)+1, self.tlength-1], ['0', middlet, endtime])
+        plt.xticks([0, int(tlength/2)+1, tlength-1], ['0', middlet, endtime])
         plt.yticks([0,int(nfreqs/2),nfreqs-1],
                     [str(self.freqs[0])+' Hz', middlef+' Hz', str(int(self.freqs[-1]/1000))+ ' kHz'])
         plt.colorbar()

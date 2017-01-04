@@ -76,7 +76,9 @@ class Sparsenet(sparsenet.Sparsenet):
         self.update_gains = self.gains.assign(self.gains*tf.pow(self.var_goal/self.ma_variances, self.gain_rate))
         self.renorm_phi = self.phi.assign((tf.expand_dims(self.gains,dim=1)*tf.nn.l2_normalize(self.phi, dim=1)))
         
-        self.sess = tf.Session()
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+        config = tf.ConfigProto(gpu_options=gpu_options)
+        self.sess = tf.Session(config=config)
         
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1)))
