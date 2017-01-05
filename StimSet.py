@@ -148,7 +148,7 @@ class SpectroPCSet(PCvecSet):
         tbin_width : time in ms separating centers of adjacent time bins
         """
         # spectrogram parameters default to those in Carlson, Ming, & DeWeese 2012
-        self.tbin_width = tbin_width or 16
+        self.tbin_width = tbin_width or 8
         self.freqs = freqs or np.logspace(2,np.log10(16000/4),256)
         super().__init__(data, stimshape, pca, batch_size)
     
