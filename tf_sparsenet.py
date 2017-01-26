@@ -165,7 +165,7 @@ class Sparsenet(sparsenet.Sparsenet):
         costs = np.zeros(self.niter)
         for ii in range(self.niter):
             _, costs[ii] = self.sess.run([self.inf_op, self.loss] , feed_dict=feed_dict)
-        plt.plot(costs)
+        plt.plot(costs, 'b')
         print("Final SNR: " + str(self.snr(feed_dict)))
 
     def snr(self, feed_dict):

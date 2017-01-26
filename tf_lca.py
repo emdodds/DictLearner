@@ -9,8 +9,6 @@ import numpy as np
 import tensorflow as tf
 import tf_sparsenet
 
-# TODO: test everything
-
 class LCALearner(tf_sparsenet.Sparsenet):
     
     def __init__(self,
@@ -27,6 +25,9 @@ class LCALearner(tf_sparsenet.Sparsenet):
                  infrate = 200.0,
                  learnrate = 2.0):
         """
+        Sparse dictionary learner using the hard locally competitive algorithm
+        from Rozell et al 2008 for inference.
+        
         Parameters
         data        : [nsamples, ndim] numpy array of training data
         datatype    : (str) "image" or "spectro"
@@ -64,7 +65,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
         self.u = tf.Variable(tf.zeros([self.nunits,self.batch_size]),
                              trainable=False,
-                             name='internal variables')
+                             name='internal_variables')
         self.reset_u = self.u.assign(tf.zeros([self.nunits,self.batch_size]))
         
         self.acts = tf.select(tf.greater(tf.abs(self.u), self.lam),
@@ -76,7 +77,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.resid = self.X - self.Xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.acts))/self.batch_size
-        self.loss = 0.5*self.mse + self.lam*self.meanL1/self.stims.datasize
+        self.loss = 0.5*self.mse #+ self.lam*self.meanL1/self.stims.datasize
         
         # LCA inference
         self.lca_drive = tf.matmul(self.phi, tf.transpose(self.X))
@@ -90,7 +91,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         learn_step = tf.Variable(0,name='learn_step', trainable=False)
         self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
         
-        self.renorm_phi = tf.nn.l2_normalize(self.phi, dim=1)
+        self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1))
         
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         config = tf.ConfigProto(gpu_options=gpu_options)
