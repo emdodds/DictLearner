@@ -8,30 +8,55 @@ import sparsenet
 class Sparsenet(sparsenet.Sparsenet):
     """A sparse dictionary learner based on (Olshausen and Field, 1996). Uses a tensorflow backend."""
     
-    def __init__(self, data, datatype="image", pca=None, **kwargs):
-        self.nunits = 200
-        self.batch_size = 100
-        self.paramfile = None
-        self.moving_avg_rate = 0.01
-        self.stimshape = (16,16) if datatype == 'image' else (25,256)
+    def __init__(self,
+                 data,
+                 datatype="image",
+                 pca=None,
+                 nunits = 200,
+                 batch_size = 100,
+                 paramfile = None,
+                 moving_avg_rate = 0.01,
+                 stimshape = None,
+                 lam = 0.15,
+                 niter = 200,
+                 var_goal = 0.04,
+                 var_avg_rate=0.1,
+                 gain_rate = 0.0001,
+                 infrate = 200.0,
+                 learnrate = 2.0):
+        """
+        Parameters
+        data        : [nsamples, ndim] numpy array of training data
+        datatype    : (str) "image" or "spectro"
+        pca         : PCA object with inverse_transform(), or None if pca not used
+        nunits      : (int) number of units in sparsenet model
+        batch_size  : (int) number of samples in each batch for learning
+        paramfile   : (str) filename for pickle file storing parameters
+        moving_avg_rate: (float) rate for updating average statistics
+        stimshape   : (array-like) original shape of each training datum
+        lam         : (float) sparsity parameter; higher means more sparse
+        niter       : (int) number of time steps in inference
+        var_goal    : (float) target variance of activities
+        var_avg_rate: (float) rate for updating moving average activity variance
+        gain_rate   : (float) rate for updating gains to control activity variance
+        infrate     : (float) gradient descent rate for inference
+        learnrate   : (float) gradient descent rate for learning
+        """
+        # save input parameters
+        self.nunits = nunits
+        self.batch_size = batch_size
+        self.paramfile = paramfile
+        self.moving_avg_rate = moving_avg_rate
+        self.stimshape = stimshape or ((16,16) if datatype == 'image' else (25,256))
+        self.lam = lam
+        self.niter = niter
+        self.var_goal = var_goal
+        self.var_avg_rate = var_avg_rate
+        self.gain_rate = gain_rate
+        self.infrate = infrate
+        self.learnrate = learnrate
         
-        self.lam = 0.15
-        
-        self.niter = 200
-        self.var_goal = 0.1 if datatype == 'image' else 0.033
-        self.var_avg_rate = 0.1
-        self.gain_rate = 0.001
-        
-        self.infrate = 200.0
-        self.learnrate = 2.0
-        
-        for key, val in kwargs.items():
-            try:
-                getattr(self,key)
-            except AttributeError:
-                print('Unexpected parameter passed:' + key)
-            setattr(self, key, val)
-        
+        # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
         self.initialize_graph()
         self.initialize_stats()
