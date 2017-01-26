@@ -31,7 +31,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         except KeyError:
             super().__init__(data, datatype = datatype, pca = pca, lam=0, **kwargs)
 
-    def initialize_graph(self):
+    def build_graph(self):
         self.nunits = int(np.prod(self.dict_shape))
         self.g = tf.constant(self.layer_two_weights(), dtype=tf.float32)
         

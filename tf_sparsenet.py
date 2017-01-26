@@ -58,7 +58,7 @@ class Sparsenet(sparsenet.Sparsenet):
         
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
-        self.initialize_graph()
+        self.build_graph()
         self.initialize_stats()
 
     def initialize_stats(self):
@@ -71,7 +71,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.mse_history = np.append(self.mse_history, mse_value)
         self.L1_history = np.append(self.L1_history, meanL1_value/self.nunits)
     
-    def initialize_graph(self):
+    def build_graph(self):
         self.infrate = tf.Variable(self.infrate, trainable=False)
         self.learnrate = tf.Variable(self.learnrate, trainable=False)
         
@@ -189,8 +189,8 @@ class Sparsenet(sparsenet.Sparsenet):
         self.sess.run(self.learnrate.assign(learnrate))
     
     def adjust_rates(self, factor):
-        self.set_infrate(self.sess.run(self.infrate))
-        self.set_learnrate(self.sess.run(self.learnrate))
+        self.set_infrate(self.sess.run(factor*self.infrate))
+        self.set_learnrate(self.sess.run(factor*self.learnrate))
     
     def sort_dict(self, batch_size=None, plot = False, allstims = True, savestr=None):
         raise NotImplementedError
