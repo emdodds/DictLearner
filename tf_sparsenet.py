@@ -251,12 +251,20 @@ class Sparsenet(sparsenet.Sparsenet):
     def get_histories(self):
         return {'loss' : self.loss_history,
                 'mse': self.mse_history,
-                'L1' : self.L1_history}
+                'L1' : self.L1_history,
+                'L0acts' : self.L0acts,
+                'L1acts' : self.L1acts,
+                'L2acts' : self.L2acts,
+                'meanacts' : self.meanacts}
     
     def set_histories(self, histories):
         self.loss_history = histories['loss']
         self.mse_history = histories['mse']
         self.L1_history = histories['L1']
+        self.L0acts = histories['L0acts']
+        self.L1acts = histories['L1acts']
+        self.L2acts = histories['L2acts']
+        self.meanacts = histories['meanacts']
     
     @property
     def Q(self):
