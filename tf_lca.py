@@ -48,19 +48,19 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.paramfile = paramfile
         self.moving_avg_rate = moving_avg_rate
         self.stimshape = stimshape or ((16,16) if datatype == 'image' else (25,256))
-        self.lam = lam
         self.niter = niter
         self.infrate = infrate
         self.learnrate = learnrate
         
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
-        self.build_graph()
+        self.build_graph(lam)
         self.initialize_stats()
         
-    def build_graph(self):
+    def build_graph(self, lam):
         self.infrate = tf.Variable(self.infrate, trainable=False)
         self.learnrate = tf.Variable(self.learnrate, trainable=False)
+        self.thresh = tf.Variable(lam, trainable=False)
         
         self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
         self.u = tf.Variable(tf.zeros([self.nunits,self.batch_size]),
@@ -68,7 +68,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
                              name='internal_variables')
         self.reset_u = self.u.assign(tf.zeros([self.nunits,self.batch_size]))
         
-        self.acts = tf.select(tf.greater(tf.abs(self.u), self.lam),
+        self.acts = tf.select(tf.greater(tf.abs(self.u), self.thresh),
                               self.u, tf.zeros([self.nunits, self.batch_size]),
                                 name='activity')
         
@@ -122,3 +122,11 @@ class LCALearner(tf_sparsenet.Sparsenet):
         'niter' : self.niter,
         'infrate' : irate,
         'learnrate' : lrnrate}
+        
+    @property
+    def lam(self):
+        return self.sess.run(self.thresh)
+        
+    @lam.setter
+    def lam(self, lam):
+        self.sess.run(self.thresh.assign(lam))
