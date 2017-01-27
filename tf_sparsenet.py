@@ -65,11 +65,22 @@ class Sparsenet(sparsenet.Sparsenet):
         self.loss_history = np.array([])
         self.mse_history = np.array([])
         self.L1_history = np.array([])
+        nunits = self.nunits
+        self.L0acts = np.zeros(nunits)
+        self.L1acts = np.zeros(nunits)
+        self.L2acts = np.zeros(nunits)
+        self.meanacts = np.zeros_like(self.L0acts)
     
-    def store_stats(self, loss_value, mse_value, meanL1_value):
+    def store_stats(self, acts, loss_value, mse_value, meanL1_value):
         self.loss_history = np.append(self.loss_history, loss_value)
         self.mse_history = np.append(self.mse_history, mse_value)
         self.L1_history = np.append(self.L1_history, meanL1_value/self.nunits)
+        self.L2acts = (1-self.moving_avg_rate)*self.L2acts + self.moving_avg_rate*(acts**2).mean(1)
+        self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
+        L0means = np.mean(acts != 0, axis=1)
+        self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
+        means = acts.mean(1)
+        self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*means
     
     def build_graph(self):
         self.infrate = tf.Variable(self.infrate, trainable=False)
@@ -120,7 +131,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.sess.run(self.update_gains)
         self.sess.run(self.renorm_phi)
     
-        return loss_value, mse_value, meanL1_value
+        return self.sess.run(self.acts), loss_value, mse_value, meanL1_value
 
     def run(self, nbatches=1000):
         for tt in range(nbatches):
@@ -195,11 +206,20 @@ class Sparsenet(sparsenet.Sparsenet):
     def sort_dict(self, batch_size=None, plot = False, allstims = True, savestr=None):
         raise NotImplementedError
     
-    def fast_sort(self, L1=False, plot=False, savestr=None):
-        raise NotImplementedError
-    
     def sort(self, usages, sorter, plot=False, savestr=None):
-        raise NotImplementedError
+        self.Q = self.Q[sorter]
+        self.L0acts = self.L0acts[sorter]
+        self.L1acts = self.L1acts[sorter]
+        self.L2acts = self.L2acts[sorter]
+        self.meanacts = self.meanacts[sorter]
+        if plot:
+            plt.figure()
+            plt.plot(usages[sorter])
+            plt.title('L0 Usage')
+            plt.xlabel('Dictionary index')
+            plt.ylabel('Fraction of stimuli')
+            if savestr is not None:
+                plt.savefig(savestr,format='png', bbox_inches='tight')
     
     def get_param_list(self):
         lrnrate = self.sess.run(self.learnrate)

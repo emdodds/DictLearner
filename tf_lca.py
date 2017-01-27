@@ -110,7 +110,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         
         self.sess.run(self.renorm_phi)
     
-        return loss_value, mse_value, meanL1_value
+        return self.sess.run(self.acts), loss_value, mse_value, meanL1_value
         
     def get_param_list(self):
         lrnrate = self.sess.run(self.learnrate)
