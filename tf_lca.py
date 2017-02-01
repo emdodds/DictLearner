@@ -23,9 +23,10 @@ class LCALearner(tf_sparsenet.Sparsenet):
                  lam = 0.15,
                  niter = 200,
                  infrate = 200.0,
-                 learnrate = 2.0):
+                 learnrate = 2.0,
+                 L0=False):
         """
-        Sparse dictionary learner using the hard locally competitive algorithm
+        Sparse dictionary learner using the L1 or L0 locally competitive algorithm
         from Rozell et al 2008 for inference.
         
         Parameters
@@ -41,6 +42,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         niter       : (int) number of time steps in inference
         infrate     : (float) gradient descent rate for inference
         learnrate   : (float) gradient descent rate for learning
+        L0          : (bool) use hard threshold if true, otherwise soft
         """
         # save input parameters
         self.nunits = nunits
@@ -51,6 +53,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.niter = niter
         self.infrate = infrate
         self.learnrate = learnrate
+        self.threshfunc = 'hard' if L0 else 'soft'
         
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
@@ -68,8 +71,13 @@ class LCALearner(tf_sparsenet.Sparsenet):
                              name='internal_variables')
         self.reset_u = self.u.assign(tf.zeros([self.nunits,self.batch_size]))
         
-        self.acts = tf.select(tf.greater(tf.abs(self.u), self.thresh),
+        if self.threshfunc == 'hard':
+            self.acts = tf.select(tf.greater(tf.abs(self.u), self.thresh),
                               self.u, tf.zeros([self.nunits, self.batch_size]),
+                                name='activity')
+        else:
+            self.acts = tf.select(tf.greater(tf.abs(self.u), self.thresh),
+                              self.u-self.thresh, tf.zeros([self.nunits, self.batch_size]),
                                 name='activity')
         
         self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
