@@ -69,7 +69,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.u = tf.Variable(tf.zeros([self.nunits,self.batch_size]),
                              trainable=False,
                              name='internal_variables')
-        self.reset_u = self.u.assign(tf.zeros([self.nunits,self.batch_size]))
+        self.reset_acts = self.u.assign(tf.zeros([self.nunits,self.batch_size]))
         
         if self.threshfunc == 'hard':
             self.acts = tf.select(tf.greater(tf.abs(self.u), self.thresh),
@@ -110,7 +110,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         
     def train_step(self):
         feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
-        self.sess.run(self.reset_u)
+        self.sess.run(self.reset_acts)
         for ii in range(self.niter):
             self.sess.run([self.inf_op], feed_dict=feed_dict)
         

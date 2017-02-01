@@ -174,6 +174,7 @@ class Sparsenet(sparsenet.Sparsenet):
     def test_inference(self):
         feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
         costs = np.zeros(self.niter)
+        self.sess.run(self.reset_acts)
         for ii in range(self.niter):
             _, costs[ii] = self.sess.run([self.inf_op, self.loss] , feed_dict=feed_dict)
         plt.plot(costs, 'b')
