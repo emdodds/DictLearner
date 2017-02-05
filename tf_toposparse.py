@@ -42,7 +42,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
         self.reset_acts = self.acts.assign(tf.zeros([self.nunits,self.batch_size]))
         
-        self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
+        self.X = tf.Variable(tf.zeros([self.batch_size, self.stims.datasize]), trainable=False)
         self.Xhat = tf.matmul(tf.transpose(self.acts), self.phi)
         self.resid = self.X - self.Xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize

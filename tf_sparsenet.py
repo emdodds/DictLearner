@@ -90,7 +90,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
         self.reset_acts = self.acts.assign(tf.zeros([self.nunits,self.batch_size]))
         
-        self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
+        self.X = tf.Variable(tf.zeros([self.batch_size, self.stims.datasize]), trainable=False)
         self.Xhat = tf.matmul(tf.transpose(self.acts), self.phi)
         self.resid = self.X - self.Xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
@@ -98,8 +98,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.loss = 0.5*self.mse + self.lam*self.meanL1/self.stims.datasize
         
         inferer = tf.train.GradientDescentOptimizer(self.infrate)
-        inf_step = tf.Variable(0, name='inf_step', trainable=False)
-        self.inf_op = inferer.minimize(self.loss, global_step=inf_step, var_list=[self.acts])
+        self.inf_op = inferer.minimize(self.loss, var_list=[self.acts])
         
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
         learn_step = tf.Variable(0,name='learn_step', trainable=False)
@@ -119,13 +118,16 @@ class Sparsenet(sparsenet.Sparsenet):
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1)))
 
+    def feed_rand_batch(self):
+        self.sess.run(self.X.assign(self.stims.rand_stim(batch_size=self.batch_size).T))
+
     def train_step(self):
-        feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
+        self.feed_rand_batch()
         self.sess.run(self.reset_acts)
         for ii in range(self.niter):
-            self.sess.run([self.inf_op, self.loss], feed_dict=feed_dict)
+            self.sess.run([self.inf_op, self.loss])
         
-        _, loss_value, mse_value, meanL1_value = self.sess.run([self.learn_op, self.loss, self.mse, self.meanL1], feed_dict=feed_dict)
+        _, loss_value, mse_value, meanL1_value = self.sess.run([self.learn_op, self.loss, self.mse, self.meanL1])
         
         self.sess.run(self.update_variance)
         self.sess.run(self.update_gains)
@@ -172,19 +174,20 @@ class Sparsenet(sparsenet.Sparsenet):
             plt.savefig(savestr, bbox_inches='tight')
 
     def test_inference(self):
-        feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
+        self.feed_rand_batch()
         costs = np.zeros(self.niter)
         self.sess.run(self.reset_acts)
         for ii in range(self.niter):
-            _, costs[ii] = self.sess.run([self.inf_op, self.loss] , feed_dict=feed_dict)
+            _, costs[ii] = self.sess.run([self.inf_op, self.loss])
         plt.plot(costs, 'b')
-        print("Final SNR: " + str(self.snr(feed_dict)))
+        print("Final SNR: " + str(self.snr()))
+        return (self.sess.run(self.acts), costs)
 
-    def snr(self, feed_dict):
-        """Returns the signal-noise ratio for the given data and current coefficients."""
-        data = feed_dict[self.X]
-        sig = np.var(data,axis=0)
-        noise = np.var(data - self.sess.run(self.Xhat, feed_dict=feed_dict), axis=0)
+    def snr(self):
+        """Returns the signal-noise ratio for the current data and current coefficients."""
+        data = self.sess.run(self.X)
+        sig = np.var(data,axis=1)
+        noise = np.var(data - self.sess.run(self.Xhat), axis=1)
         return np.mean(sig/noise)
     
     def progress_plot(self, window_size=1000, norm=1, start=0, end=-1):
@@ -196,9 +199,15 @@ class Sparsenet(sparsenet.Sparsenet):
     
     def set_infrate(self, infrate):
         self.sess.run(self.infrate.assign(infrate))
+
+    def get_infrate(self):
+        return self.sess.run(self.infrate)
     
     def set_learnrate(self, learnrate):
         self.sess.run(self.learnrate.assign(learnrate))
+
+    def get_learnrate(self):
+        return self.sess.run(self.learnrate)
     
     def adjust_rates(self, factor):
         self.set_infrate(self.sess.run(factor*self.infrate))

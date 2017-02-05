@@ -5,11 +5,11 @@ Created on Tue Jul 26 15:55:22 2016
 @author: Eric
 """
 
-import DictLearner
+from DictLearner import DictLearner as BaseLearner
 import numpy as np
 import matplotlib.pyplot as plt
 
-class Sparsenet(DictLearner.DictLearner):
+class Sparsenet(BaseLearner):
     """A sparse dictionary learner based on (Olshausen and Field, 1996)."""
     
     def __init__(self, data, nunits, learnrate=0.01, measure='abs', infrate=0.01,
