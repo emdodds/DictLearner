@@ -165,7 +165,7 @@ class DictLearner(object):
         return corrmatrix
         
     
-    def show_dict(self, stimset=None, cmap='RdBu', subset=None, layout='sqrt', savestr=None):
+    def show_dict(self, stimset=None, cmap='RdBu_r', subset=None, layout='sqrt', savestr=None):
         """Plot an array of tiled dictionary elements. The 0th element is in the top right."""
         stimset = stimset or self.stims
         if subset is not None:

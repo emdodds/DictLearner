@@ -152,14 +152,13 @@ class SpectroPCSet(PCvecSet):
         self.freqs = freqs or np.logspace(2,np.log10(16000/4),256)
         super().__init__(data, stimshape, pca, batch_size)
     
-    def show_stim(self, stim, cmap='RdBu', savestr=None):
-        if cmap == 'RdBu':
-            # to minimize confusion for those used to jet, make red positive and blue negative
-            stim = -stim
+    def show_stim(self, stim, cmap='RdBu_r', savestr=None, cbar = False):
         reshaped = self.stim_for_display(stim)
         tlength, nfreqs = self.stimshape
+        vmax = np.max(reshaped)
         plt.imshow(reshaped.T, interpolation= 'nearest',
-                   cmap=cmap, aspect='auto', origin='lower')
+                   cmap=cmap, aspect='auto', origin='lower',
+                   vmin=-vmax, vmax=vmax)
         plt.ylabel('Frequency')
         plt.xlabel('Time (ms, bin = '+str(self.tbin_width)+' ms)')
         middlef = str(int(self.freqs[int(nfreqs/2)]))
@@ -168,20 +167,18 @@ class SpectroPCSet(PCvecSet):
         plt.xticks([0, int(tlength/2)+1, tlength-1], ['0', middlet, endtime])
         plt.yticks([0,int(nfreqs/2),nfreqs-1],
                     [str(self.freqs[0])+' Hz', middlef+' Hz', str(int(self.freqs[-1]/1000))+ ' kHz'])
-        plt.colorbar()
+        if cbar:
+            plt.colorbar()
         if savestr is not None:
             plt.savefig(savestr, bbox_inches='tight')
         plt.show()
         
-    def show_set(self, stims, cmap='RdBu', layout=(4,5), savestr=None):
+    def show_set(self, stims, cmap='RdBu_r', layout=(4,5), savestr=None):
         """
         Parameters:
         stims : (number of stim, flattened stim length) stimuli to plot
         layout : (number of rows, number of columns) per figure
         """
-        if cmap == 'RdBu':
-            # to minimize confusion for those used to jet, make red positive and blue negative
-            stims = -stims
         tlength, nfreqs = self.stimshape
         per_figure = np.prod(layout)
         nstim = stims.shape[0]
