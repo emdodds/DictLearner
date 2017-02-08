@@ -96,7 +96,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
             du = self.lca_drive - lca_compet - old_u
             return old_u + self.infrate*du
 
-        self._itercount = tf.constant(np.arange(self.niter))
+        self._itercount = tf.Variable(np.arange(self.niter), trainable = False)
         self._infu = tf.scan(next_u, self._itercount, initializer = tf.zeros([self.nunits,self.batch_size]))
         self.u = self._infu[-1]
         
