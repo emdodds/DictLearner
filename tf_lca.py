@@ -40,7 +40,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         moving_avg_rate: (float) rate for updating average statistics
         stimshape   : (array-like) original shape of each training datum
         lam         : (float) sparsity parameter; higher means more sparse
-        niter       : (int) number of time steps in inference
+        niter       : (int) number of time steps in inference (not dynamically adjustable)
         infrate     : (float) gradient descent rate for inference
         learnrate   : (float) gradient descent rate for learning
         threshfunc  : (str) specifies which thresholding function to use
@@ -96,7 +96,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
             du = self.lca_drive - lca_compet - old_u
             return old_u + self.infrate*du
 
-        self._itercount = tf.Variable(np.arange(self.niter), trainable = False)
+        self._itercount = tf.constant(np.arange(self.niter))
         self._infu = tf.scan(next_u, self._itercount, initializer = tf.zeros([self.nunits,self.batch_size]))
         self.u = self._infu[-1]
         
@@ -176,7 +176,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
     @niter.setter
     def niter(self, value):
         self._niter = value
-        self.sess.run(self._itercount.assign(np.arange(value)))
+        self.build_graph(self.lam)
 
     def feed_rand_batch(self):
         raise AttributeError
