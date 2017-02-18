@@ -3,12 +3,13 @@
 import tensorflow as tf
 import tf_sparsenet
 import numpy as np
+import scipy.linalg
 
 class TopoSparsenet(tf_sparsenet.Sparsenet):
     """Topographic Sparsenet with TensorFlow backend and a few methods for defining topologies."""
 	
     def __init__(self, data, datatype="image", pca=None,
-      dict_shape = (30,30), lam_g=0.1, sigma=1.0,
+      dict_shape = (30,30), topo = None, lam_g=0.1,
       **kwargs):
         """
         Topographic Sparsenet inherits from Sparsenet. Its unique
@@ -18,13 +19,14 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         
         Args:
         lam_g : float, defines weight of topography term
-        sigma : float, defines stdev of default gaussian neighborhoods
         dict_shape : tuple (len, wid) of ints specifying shape of dictionary
         """
         self.lam_g = lam_g
         self.epsilon = 0.0001 # to regularize derivative of square root
         self.sigma = sigma
         self.dict_shape = dict_shape
+        self.nunits = int(np.prod(self.dict_shape))
+        self.topo = topo or topology((self.nunits, self.nunits))
         try:
             kwargs['lam']
             super().__init__(data, datatype = datatype, pca = pca, **kwargs)
@@ -32,8 +34,8 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
             super().__init__(data, datatype = datatype, pca = pca, lam=0, **kwargs)
 
     def build_graph(self):
-        self.nunits = int(np.prod(self.dict_shape))
-        self.g = tf.constant(self.layer_two_weights(), dtype=tf.float32)
+        self.g = tf.constant(self.layer_two_weights(self.topology), dtype=tf.float32)
+        assert self.g.shape[1] == self.nunits, 'Topology matrix shape must match layer 1 size.'
         
         self.infrate = tf.Variable(self.infrate, trainable=False)
         self.learnrate = tf.Variable(self.learnrate, trainable=False)
@@ -72,10 +74,58 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1, epsilon=1e-15)))
 
+    def show_dict(self, cmap='RdBu', subset=None, layout=None, savestr=None):
+        layout = layout or self.dict_shape
+        super().show_dict(cmap, subset, layout, savestr)
+
+    def sort(self, *args, **kwargs):
+        print("The topographic order is meaningful, don't sort it away!") 
+
+
+class topology():
+    def __init__(self, shape, discs=True, torus=True, binary=True, sigma = 1.0, ncomponents = 1):
+        """
+        shape: (tuple) shape of each component
+        sigma : (float) defines stdev of default gaussian neighborhoods
+        """
+        self.shape = shape
+        dict_side = int(np.sqrt(self.shape[1]))
+        assert dict_side**2 == self.shape[1], 'Only square dictionaries supported.'
+        self.dict_shape = (dict_side, dict_side)
+        self.discs = discs
+        self.torus = torus
+        self.binary = binary
+        self.sigma = sigma
+        self.ncomponents = ncomponents
+
+    def get_matrix(self):
+        
+        g = np.zeros(self.shape)
+        
+        if self.discs:
+            g = self.make_discs(g, *self.shape)
+
+        if self.ncomponents > 1:
+            blocks = [g.copy() for ii in range(self.ncomponents)]
+            g = scipy.linalg.block_diag(*blocks)
+
+        if self.binary:
+            g = self.binarize(g)
+        
+        return g
+
+    def make_discs(self, g, nlayer2, nlayer1):
+        sigsquared = self.sigma**2
+        for i in range(nlayer2):
+            for j in range(nlayer1):
+                g[i, j] = np.exp(-self.distance(i, j)/(2 * sigsquared))
+        return g
+
     def distance(self, i, j):
-        """ This function measures the distance between element i and j. The distance 
+        """ This function measures the squared distance between element i and j. The distance 
         here is the distance between element i and j once the row vector has been 
-        reshaped into a square matrix, treating the dictionary as a torus globally."""
+        reshaped into a square matrix, treating the dictionary as a torus globally
+        if torus is True."""
         
         rows, cols = self.dict_shape
         rowi = i // cols
@@ -83,34 +133,24 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         rowj = j // cols
         colj = j % cols
         
-        # global topology is a torus
-        rowj = [rowj - rows, rowj, rowj + rows]
-        colj = [colj - cols, colj, colj + cols]
-        
-        dist = []
-        for r in rowj:
-            for c in colj:
-                dist.append((rowi - r)**2 + (coli - c)**2)
-        
-        return np.min(dist)
-
-    def layer_two_weights(self):
-        """This is currently only working for the case when (# of layer 2
-        units) = (# of layer 1 units) """
-        
-        g = np.zeros((self.nunits, self.nunits))
-        
-        sigsquared = self.sigma**2
-        for i in range(self.nunits):
-            for j in range(self.nunits):
-                g[i, j] = np.exp(-self.distance(i, j)/(2 * sigsquared))
-        
-        return g
+        if self.torus:
+            # global topology is a torus
+            rowj = [rowj - rows, rowj, rowj + rows]
+            colj = [colj - cols, colj, colj + cols]
+            
+            dist = []
+            for r in rowj:
+                for c in colj:
+                    dist.append((rowi - r)**2 + (coli - c)**2)
+            
+            return np.min(dist)
+        else:
+            return (rowi - rowj)**2 + (coli - colj)**2
 
     def block_membership(self, i, j, width=5):
         """This returns 1 if j is in the ith block, otherwise 0. Currently only
         works for square dictionaries."""
-        # TODO: I think there's a bug here that makes the boundary conditions
+        # FIXME: I think there's a bug here that makes the boundary conditions
         # and the sizes wrong
         size = self.dict_shape[0]
         if size != self.dict_shape[1]:
@@ -126,20 +166,14 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
     def set_blocks(self, width=5):
         """Change the topography by making each second layer unit respond to
         a square block of layer one with given width. g becomes binary."""
+        # FIXME: doesn't work because block_membership doesn't work
         self.g = np.zeros_like(self.g)
         nunits = np.prod(self.dict_shape)
         for i in range(nunits):
             for j in range(nunits):
                 self.g[i, j] = self.block_membership(i, j, width)
 
-    def binarize_g(self, thresh=1/2, width=None):
+    def binarize(self, g, thresh=1/2, width=None):
         if width is not None:
             thresh = np.exp(-width**2/(2*self.sigma**2))
-            self.g = np.array(self.g >= thresh, dtype=int)
-
-    def show_dict(self, cmap='RdBu', subset=None, layout=None, savestr=None):
-        layout = layout or self.dict_shape
-        super().show_dict(cmap, subset, layout, savestr)
-
-    def sort(self, *args, **kwargs):
-        print("The topographic order is meaningful, don't sort it away!") 
+        return np.array(g >= thresh, dtype=int)
