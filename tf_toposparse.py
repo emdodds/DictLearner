@@ -26,12 +26,12 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         self.dict_shape = dict_shape
         nunits = int(np.prod(self.dict_shape))
         self.topo = topo or topology((nunits, nunits))
-        self.nunits = topo.ncomponents * nunits
+        nunits = topo.ncomponents * nunits
         try:
             kwargs['lam']
-            super().__init__(data, datatype = datatype, pca = pca, **kwargs)
+            super().__init__(data, nunits=nunits, datatype = datatype, pca = pca, **kwargs)
         except KeyError:
-            super().__init__(data, datatype = datatype, pca = pca, lam=0, **kwargs)
+            super().__init__(data, nunits=nunits, datatype = datatype, pca = pca, lam=0, **kwargs)
 
     def build_graph(self):
         self.g = tf.constant(self.topo.get_matrix(), dtype=tf.float32)
