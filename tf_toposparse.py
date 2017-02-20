@@ -34,7 +34,6 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
 
     def build_graph(self):
         self.g = tf.constant(self.topo.get_matrix(), dtype=tf.float32)
-        assert self.g.shape[1] == self.nunits, 'Topology matrix shape must match layer 1 size.'
         
         self.infrate = tf.Variable(self.infrate, trainable=False)
         self.learnrate = tf.Variable(self.learnrate, trainable=False)
