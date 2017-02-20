@@ -70,7 +70,7 @@ savestr = (resultsfolder+'TSN'+str(shape[0]) + 'lg' + str(lam_g) +
                 ('b' if binarize else '') +
                 ('d' if discs else '') +
                 ('t' if torus else '') +
-                (str(ncomponents) if ncomponents>1 else '')
+                (str(ncomponents) if ncomponents>1 else '') +
                 's'+str(sigma))
 net.save(savestr+'.pickle')
 net.run(50000)
