@@ -85,7 +85,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
 class topology():
     def __init__(self, shape, discs=True, torus=True, binary=True, sigma = 1.0, ncomponents = 1):
         """
-        shape: (tuple) shape of each component
+        shape: (tuple) (nlayer2comp, nlayer1) shape of each component
         sigma : (float) defines stdev of default gaussian neighborhoods
         """
         self.shape = shape

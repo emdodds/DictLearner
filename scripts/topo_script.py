@@ -17,7 +17,7 @@ parser.add_argument('--dictlength', default=30, type=int)
 parser.add_argument('--sigma', default = 1, type=float)
 parser.add_argument('--binarize', action='store_true')
 parser.add_argument('--discs', default=True, type=bool)
-parser.add_argument('--torus' default=True, type=bool)
+parser.add_argument('--torus', default=True, type=bool)
 parser.add_argument('--ncomponents', default=1, type=int)
 args=parser.parse_args()
 
