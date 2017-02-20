@@ -10,7 +10,7 @@ parser.add_argument('-r', '--resultsfolder', default='',type=str)
 parser.add_argument('-s', '--suffix', default='ptwise', type=str)
 parser.add_argument('-i', '--niter', default=200, type=int)
 parser.add_argument('-l', '--lam', default=0.0, type=float)
-parser.add_argument('-l', '--lam_g', default=0.05, type=float)
+parser.add_argument('--lam_g', default=0.05, type=float)
 #parser.add_argument('--shape', default = (25,32), type=tuple) doesn't work
 
 parser.add_argument('--dictlength', default=30, type=int)
