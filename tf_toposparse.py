@@ -23,7 +23,6 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         """
         self.lam_g = lam_g
         self.epsilon = 0.0001 # to regularize derivative of square root
-        self.sigma = sigma
         self.dict_shape = dict_shape
         self.nunits = int(np.prod(self.dict_shape))
         self.topo = topo or topology((self.nunits, self.nunits))
