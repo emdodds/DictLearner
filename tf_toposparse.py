@@ -15,7 +15,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         Topographic Sparsenet inherits from Sparsenet. Its unique
         attributes give the dictionary a shape and define the relative 
         weight of the topographic term in the cost function.
-        The topology matrix g is defined by the function layer_two_weights.
+        The topology matrix g is defined by the topology object topo.
         
         Args:
         lam_g : float, defines weight of topography term
@@ -24,8 +24,9 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         self.lam_g = lam_g
         self.epsilon = 0.0001 # to regularize derivative of square root
         self.dict_shape = dict_shape
-        self.nunits = int(np.prod(self.dict_shape))
-        self.topo = topo or topology((self.nunits, self.nunits))
+        nunits = int(np.prod(self.dict_shape))
+        self.topo = topo or topology((nunits, nunits))
+        self.nunits = topo.ncomponents * nunits
         try:
             kwargs['lam']
             super().__init__(data, datatype = datatype, pca = pca, **kwargs)
