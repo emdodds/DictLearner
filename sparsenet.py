@@ -9,7 +9,7 @@ from DictLearner import DictLearner as BaseLearner
 import numpy as np
 import matplotlib.pyplot as plt
 
-class Sparsenet(BaseLearner.DictLearner):
+class Sparsenet(BaseLearner):
     """A sparse dictionary learner based on (Olshausen and Field, 1996)."""
     
     def __init__(self, data, nunits, learnrate=0.01, measure='abs', infrate=0.01,
