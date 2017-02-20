@@ -59,7 +59,7 @@ elif data == 'spectros':
         resultsfolder = '../audition/Results/'
     
     net = tf_toposparse.TopoSparsenet(data=data, dict_shape=shape, datatype='spectro', pca=mypca, 
-                            topo=topo
+                            topo=topo,
                            stimshape=origshape,
                            lam=lam, lam_g = lam_g,
                            niter = niter,
