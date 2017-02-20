@@ -48,7 +48,7 @@ if data == 'images':
     net = TopoSparsenet.TopoSparsenet(data, shape, paramfile='dummy')
     net.gain_rate = 0.001
 elif data == 'spectros':
-    datafile = '../audition/Data/speech_ptwisecut'
+    datafile = '../Data/speech_ptwisecut'
     numinput = 200
     
     with open(datafile+'_pca.pickle', 'rb') as f:
