@@ -4,6 +4,7 @@ import tensorflow as tf
 import tf_sparsenet
 import numpy as np
 import scipy.linalg
+import matplotlib.pyplot as plt
 
 class TopoSparsenet(tf_sparsenet.Sparsenet):
     """Topographic Sparsenet with TensorFlow backend and a few methods for defining topologies."""
@@ -79,12 +80,20 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         super().show_dict(cmap, subset, layout, savestr)
 
     def show_dict(self, cmap='RdBu_r', layout=None, savestr=None):
+        Qs = self.Q
         layout = layout or self.dict_shape
         ncomp = self.topo.ncomponents
         display = np.zeros([ncomp*layout[0],layout[1]])
         per_comp = np.prod(layout)
         for nn in range(ncomp):
             display[nn*layout[0]:(nn+1)*layout[0]] = self.stims.stimarray(Qs[nn*per_comp:(nn+1)*per_comp], layout=layout)
+        plt.figure()
+        arrayplot = plt.imshow(display,interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
+        plt.axis('off')
+        plt.colorbar()
+        if savestr is not None:
+            plt.savefig(savestr, bbox_inches='tight')
+        return display
 
     def sort(self, *args, **kwargs):
         print("The topographic order is meaningful, don't sort it away!") 
