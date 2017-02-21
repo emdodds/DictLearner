@@ -83,10 +83,12 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         Qs = self.Q
         layout = layout or self.dict_shape
         ncomp = self.topo.ncomponents
-        display = np.zeros([ncomp*layout[0],layout[1]])
         per_comp = np.prod(layout)
-        for nn in range(ncomp):
-            display[nn*layout[0]:(nn+1)*layout[0]] = self.stims.stimarray(Qs[nn*per_comp:(nn+1)*per_comp], layout=layout)
+        nn=0
+        display = self.stims.stimarray(Qs[nn*per_comp:(nn+1)*per_comp], layout=layout)
+        for nn in range(1,ncomp):
+            display = np.concatenate([display, self.stims.stimarray(Qs[nn*per_comp:(nn+1)*per_comp], layout=layout)],
+                                        axis=0)
         plt.figure()
         arrayplot = plt.imshow(display,interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
         plt.axis('off')
