@@ -74,9 +74,17 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1, epsilon=1e-15)))
 
-    def show_dict(self, cmap='RdBu', subset=None, layout=None, savestr=None):
+    def show_dict(self, cmap='RdBu_r', subset=None, layout=None, savestr=None):
         layout = layout or self.dict_shape
         super().show_dict(cmap, subset, layout, savestr)
+
+    def show_dict(self, cmap='RdBu_r', layout=None, savestr=None):
+        layout = layout or self.dict_shape
+        ncomp = self.topo.ncomponents
+        display = np.zeros([ncomp*layout[0],layout[1]])
+        per_comp = np.prod(layout)
+        for nn in range(ncomp):
+            display[nn*layout[0]:(nn+1)*layout[0]] = self.stims.stimarray(Qs[nn*per_comp:(nn+1)*per_comp], layout=layout)
 
     def sort(self, *args, **kwargs):
         print("The topographic order is meaningful, don't sort it away!") 
