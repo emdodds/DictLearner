@@ -27,7 +27,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         self.dict_shape = dict_shape
         nunits = int(np.prod(self.dict_shape))
         self.topo = topo or topology((nunits, nunits))
-        nunits = topo.ncomponents * nunits
+        nunits = self.topo.ncomponents * nunits
         try:
             kwargs['lam']
             super().__init__(data, nunits=nunits, datatype = datatype, pca = pca, **kwargs)

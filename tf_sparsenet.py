@@ -234,6 +234,8 @@ class Sparsenet(sparsenet.Sparsenet):
     def get_param_list(self):
         lrnrate = self.sess.run(self.learnrate)
         irate = self.sess.run(self.infrate)
+        gains = self.sess.run(self.gains)
+        variances = self.sess.run(self.variances)
         return {'nunits' : self.nunits,
         'batch_size' : self.batch_size,
         'paramfile' : self.paramfile,
@@ -243,7 +245,9 @@ class Sparsenet(sparsenet.Sparsenet):
         'var_avg_rate' : self.var_avg_rate,
         'gain_rate' : self.gain_rate,
         'infrate' : irate,
-        'learnrate' : lrnrate}
+        'learnrate' : lrnrate,
+        'gains' : gains,
+        'variances' : variances}
 
     def set_params(self, params):
         for key, val in params.items():
@@ -251,6 +255,10 @@ class Sparsenet(sparsenet.Sparsenet):
                 self.sess.run(self.infrate.assign(val))
             elif key == 'learnrate':
                 self.sess.run(self.learnrate.assign(val))
+            elif key == 'gains':
+                self.sess.run(self.gains.assign(val))
+            elif key == 'variances':
+                self.sess.run(self.variances.assign(val))
             else:
                 try:
                     getattr(self,key)
