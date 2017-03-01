@@ -235,7 +235,7 @@ class Sparsenet(sparsenet.Sparsenet):
         lrnrate = self.sess.run(self.learnrate)
         irate = self.sess.run(self.infrate)
         gains = self.sess.run(self.gains)
-        variances = self.sess.run(self.variances)
+        variances = self.sess.run(self.ma_variances)
         return {'nunits' : self.nunits,
         'batch_size' : self.batch_size,
         'paramfile' : self.paramfile,
