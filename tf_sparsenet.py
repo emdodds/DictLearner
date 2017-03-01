@@ -258,7 +258,7 @@ class Sparsenet(sparsenet.Sparsenet):
             elif key == 'gains':
                 self.sess.run(self.gains.assign(val))
             elif key == 'variances':
-                self.sess.run(tf.assign(self.variances,val))
+                self.sess.run(self.ma_variances.assign(val))
             else:
                 try:
                     getattr(self,key)
