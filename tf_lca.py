@@ -56,7 +56,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self._niter = niter
         self.learnrate = learnrate
         self.threshfunc = threshfunc
-        self.snr_goal = seek_snr
+        self.snr_goal = snr_goal
         
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
