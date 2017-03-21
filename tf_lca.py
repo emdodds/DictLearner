@@ -124,9 +124,10 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1))
 
         self.snr = tf.reduce_mean(tf.square(self.X))/self.mse
-        snrconvert = tf.constant(np.log(10.0)/10.0, dtype=tf.float32)
-        snr_ratio = self.snr/tf.exp(snrconvert*tf.constant(self.snr_goal,dtype=tf.float32))
-        self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio,0.1))
+        if self.snr_goal is not None:
+            snrconvert = tf.constant(np.log(10.0)/10.0, dtype=tf.float32)
+            snr_ratio = self.snr/tf.exp(snrconvert*tf.constant(self.snr_goal,dtype=tf.float32))
+            self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio,0.1))
         self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
         
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
@@ -138,8 +139,15 @@ class LCALearner(tf_sparsenet.Sparsenet):
         
     def train_step(self):
         feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
-        acts, _, loss_value, mse_value, meanL1_value = self.sess.run([self.final_acts, self.learn_op, self.loss,
-             self.mse, self.meanL1], feed_dict=feed_dict)
+        if self.snr_goal is None:
+            op_list = [self.final_acts, self.learn_op, self.loss,
+             self.mse, self.meanL1]
+             acts, _, loss_value, mse_value, meanL1_value = self.sess.run(oplist, feed_dict=feed_dict)
+        else:
+            op_list = [self.final_acts, self.learn_op, self.loss,
+             self.mse, self.meanL1, self.seek_snr]
+             acts, _, loss_value, mse_value, meanL1_value,_ = self.sess.run(oplist, feed_dict=feed_dict)
+
         self.sess.run(self.renorm_phi)
     
         return acts, loss_value, mse_value, meanL1_value
