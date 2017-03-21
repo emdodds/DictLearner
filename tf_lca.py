@@ -140,13 +140,11 @@ class LCALearner(tf_sparsenet.Sparsenet):
     def train_step(self):
         feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
         if self.snr_goal is None:
-            op_list = [self.final_acts, self.learn_op, self.loss,
-             self.mse, self.meanL1]
-             acts, _, loss_value, mse_value, meanL1_value = self.sess.run(oplist, feed_dict=feed_dict)
+            op_list = [self.final_acts, self.learn_op, self.loss, self.mse, self.meanL1]
+            acts, _, loss_value, mse_value, meanL1_value = self.sess.run(oplist, feed_dict=feed_dict)
         else:
-            op_list = [self.final_acts, self.learn_op, self.loss,
-             self.mse, self.meanL1, self.seek_snr]
-             acts, _, loss_value, mse_value, meanL1_value,_ = self.sess.run(oplist, feed_dict=feed_dict)
+            op_list = [self.final_acts, self.learn_op, self.loss, self.mse, self.meanL1, self.seek_snr]
+            acts, _, loss_value, mse_value, meanL1_value,_ = self.sess.run(oplist, feed_dict=feed_dict)
 
         self.sess.run(self.renorm_phi)
     
