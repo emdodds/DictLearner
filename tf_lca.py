@@ -124,7 +124,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1))
 
         self.snr = tf.reduce_mean(tf.square(self.X))/self.mse
-        snr_ratio = self.snr/(10.0*tf.log(self.snr_goal)/np.log(10.0))
+        snr_ratio = self.snr/tf.exp(np.log(10.0)*self.snr_goal/10.0)
         self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio,0.1))
         self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
         
