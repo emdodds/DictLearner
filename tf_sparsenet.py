@@ -21,7 +21,7 @@ class Sparsenet(sparsenet.Sparsenet):
                  niter = 200,
                  var_goal = 0.04,
                  var_avg_rate=0.1,
-                 gain_rate = 0.0001,
+                 gain_rate = 0.01,
                  infrate = 200.0,
                  learnrate = 2.0):
         """
@@ -113,6 +113,7 @@ class Sparsenet(sparsenet.Sparsenet):
         
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         config = tf.ConfigProto(gpu_options=gpu_options)
+        config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=config)
         
         self.sess.run(tf.global_variables_initializer())

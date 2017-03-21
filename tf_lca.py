@@ -25,6 +25,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
                  niter = 200,
                  infrate = 1.0,
                  learnrate = 2.0,
+                 snr_goal = None,
                  threshfunc = 'hard'):
         """
         Sparse dictionary learner using the L1 or L0 locally competitive algorithm
@@ -55,6 +56,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self._niter = niter
         self.learnrate = learnrate
         self.threshfunc = threshfunc
+        self.snr_goal = seek_snr
         
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
@@ -120,6 +122,11 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
         
         self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1))
+
+        self.snr = tf.reduce_mean(tf.square(self.X))/self.mse
+        snr_ratio = self.snr/(10.0*tf.log(self.snr_goal)/np.log(10.0))
+        self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio,0.1))
+        self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
         
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         config = tf.ConfigProto(gpu_options=gpu_options)

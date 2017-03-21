@@ -181,6 +181,10 @@ class DictLearner(object):
         if savestr is not None:
             plt.savefig(savestr, bbox_inches='tight')
         return arrayplot
+
+    def tiled_dict(self, cmap='RdBu_r', layout='sqrt', aspect='auto', savestr=None):
+        """Hopefully nicer dictionary visualization."""
+        self.stims.tiledplot(self.Q, cmap=cmap, layout=layout, aspect=aspect,savestr=savestr)
         
     def show_element(self, index, cmap='jet', labels=None, savestr=None):
         elem = self.stims.stim_for_display(self.Q[index])

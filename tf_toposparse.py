@@ -70,6 +70,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         config = tf.ConfigProto(gpu_options=gpu_options)
+        config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=config)
         
         self.sess.run(tf.global_variables_initializer())
