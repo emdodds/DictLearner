@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except:
+    print("Can't import matplotlib.")
 import tensorflow as tf
 import sparsenet
 

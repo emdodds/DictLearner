@@ -7,7 +7,10 @@ Created on Tue Jul 26 15:55:22 2016
 
 from DictLearner import DictLearner as BaseLearner
 import numpy as np
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("Can't import matplotlib.")
 
 class Sparsenet(BaseLearner):
     """A sparse dictionary learner based on (Olshausen and Field, 1996)."""

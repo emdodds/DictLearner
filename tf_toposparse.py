@@ -3,8 +3,33 @@
 import tensorflow as tf
 import tf_sparsenet
 import numpy as np
-import scipy.linalg
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("Can't import matplotlib. No plotting.")
+
+def block_diag(*arrs):
+    """
+    copied from scipy.linalg.block_diag to avoid scipy dependency because long story
+    """
+    if arrs == ():
+        arrs = ([],)
+    arrs = [np.atleast_2d(a) for a in arrs]
+
+    bad_args = [k for k in range(len(arrs)) if arrs[k].ndim > 2]
+    if bad_args:
+        raise ValueError("arguments in the following positions have dimension "
+                            "greater than 2: %s" % bad_args)
+
+    shapes = np.array([a.shape for a in arrs])
+    out = np.zeros(np.sum(shapes, axis=0), dtype=arrs[0].dtype)
+
+    r, c = 0, 0
+    for i, (rr, cc) in enumerate(shapes):
+        out[r:r + rr, c:c + cc] = arrs[i]
+        r += rr
+        c += cc
+    return out
 
 class TopoSparsenet(tf_sparsenet.Sparsenet):
     """Topographic Sparsenet with TensorFlow backend and a few methods for defining topologies."""
@@ -127,12 +152,14 @@ class topology():
 
         if self.ncomponents > 1:
             blocks = [g.copy() for ii in range(self.ncomponents)]
-            g = scipy.linalg.block_diag(*blocks)
+            g = block_diag(*blocks)
 
         if self.binary:
             g = self.binarize(g)
         
         return g
+
+
 
     def make_discs(self, g, nlayer2, nlayer1):
         sigsquared = self.sigma**2
