@@ -68,7 +68,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         if self.threshfunc.startswith('hard'):
             thresholded = tf.identity
         else:
-            thresholded = lambda xx: tf.add(xx, -self.thresh)
+            thresholded = lambda xx: tf.add(xx, -self.thresh*tf.sign(xx))
 
         if self.threshfunc.endswith('pos') or self.threshfunc.endswith('rec'):
             rect = tf.identity
@@ -132,6 +132,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         config = tf.ConfigProto(gpu_options=gpu_options)
+        config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=config)
         
         self.sess.run(tf.global_variables_initializer())
