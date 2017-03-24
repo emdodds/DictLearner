@@ -117,7 +117,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.meanL1 = tf.reduce_sum(tf.abs(self.final_acts))/self.batch_size
         self.loss = 0.5*self.mse #+ self.lam*self.meanL1/self.stims.datasize
         
-        learner = tf.train.GradientDescentOptimizer(self.learnrate)
+        learner = tf.train.AdadeltaOptimizer(self.learnrate)
         learn_step = tf.Variable(0,name='learn_step', trainable=False)
         self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
         
