@@ -85,12 +85,14 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.thresh = tf.Variable(lam, trainable=False)
         
         self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
+        self.dropout_rate = tf.placeholder(tf.float32)
+        self.dropout_phi = tf.nn.dropout(self.phi, self.dropout_rate)
 
         self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
 
         # LCA inference
-        self.lca_drive = tf.matmul(self.phi, tf.transpose(self.X))
-        self.lca_gram = (tf.matmul(self.phi, tf.transpose(self.phi)) - 
+        self.lca_drive = tf.matmul(self.dropout_phi, tf.transpose(self.X))
+        self.lca_gram = (tf.matmul(self.dropout_phi, tf.transpose(self.dropout_phi)) - 
             tf.constant(np.identity(int(self.nunits)),dtype=np.float32))
 
         def next_u(old_u, ii):
@@ -117,7 +119,8 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.meanL1 = tf.reduce_sum(tf.abs(self.final_acts))/self.batch_size
         self.loss = 0.5*self.mse #+ self.lam*self.meanL1/self.stims.datasize
         
-        learner = tf.train.AdadeltaOptimizer(self.learnrate)
+        #learner = tf.train.AdadeltaOptimizer(self.learnrate)
+        learner = tf.train.GradientDescentOptimizer(self.learnrate)
         learn_step = tf.Variable(0,name='learn_step', trainable=False)
         self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
         
@@ -138,8 +141,9 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.renorm_phi)
         
-    def train_step(self):
-        feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
+    def train_step(self, droprate=0.2):
+        feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T,
+                        self.dropout_rate : droprate}
         if self.snr_goal is None:
             op_list = [self.final_acts, self.learn_op, self.loss, self.mse, self.meanL1]
             acts, _, loss_value, mse_value, meanL1_value = self.sess.run(op_list, feed_dict=feed_dict)
@@ -150,6 +154,18 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.sess.run(self.renorm_phi)
     
         return acts, loss_value, mse_value, meanL1_value
+
+    def run(self, ntrials = 10000, droprate=0.2):
+        for tt in range(nbatches):
+            self.store_stats(*self.train_step(droprate=droprate))
+            if tt % 50 == 0:
+                print (tt)
+                if (tt % 1000 == 0 or tt+1 == nbatches) and tt!= 0:
+                    try:
+                        print ("Saving progress to " + self.paramfile)
+                        self.save()
+                    except (ValueError, TypeError) as er:
+                        print ('Failed to save parameters. ', er)
 
     def snr(self, acts, feed_dict):
         """Returns the signal-noise ratio for the given data and coefficients."""
