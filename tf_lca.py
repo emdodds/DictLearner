@@ -156,7 +156,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         return acts, loss_value, mse_value, meanL1_value
 
     def run(self, ntrials = 10000, droprate=0.2):
-        for tt in range(nbatches):
+        for tt in range(ntrials):
             self.store_stats(*self.train_step(droprate=droprate))
             if tt % 50 == 0:
                 print (tt)
