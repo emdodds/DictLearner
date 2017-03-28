@@ -160,7 +160,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
             self.store_stats(*self.train_step(droprate=droprate))
             if tt % 50 == 0:
                 print (tt)
-                if (tt % 1000 == 0 or tt+1 == nbatches) and tt!= 0:
+                if (tt % 1000 == 0 or tt+1 == ntrials) and tt!= 0:
                     try:
                         print ("Saving progress to " + self.paramfile)
                         self.save()
