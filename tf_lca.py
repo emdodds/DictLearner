@@ -86,7 +86,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         
         self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
         self.dropout_rate = tf.placeholder(tf.float32)
-        self.dropout_phi = tf.nn.dropout(self.phi, self.dropout_rate)
+        self.dropout_phi = self.dropout_rate*tf.nn.dropout(self.phi, self.dropout_rate)
 
         self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
 
