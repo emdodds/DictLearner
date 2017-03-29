@@ -147,7 +147,7 @@ class ImageSet(StimSet):
             # normalize image
             # TODO: reconsider...
             #animage = animage - np.mean(animage)
-            #X[:,i] = animage/animage.std()
+            X[:,i] = animage#/animage.std()
         return X
         
 class PCvecSet(StimSet):
