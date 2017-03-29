@@ -23,7 +23,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
                  stimshape = None,
                  lam = 0.15,
                  niter = 200,
-                 infrate = 1.0,
+                 infrate = 0.1,
                  learnrate = 2.0,
                  snr_goal = None,
                  threshfunc = 'hard'):
@@ -64,18 +64,20 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.initialize_stats()
         
 
-    def acts(self, uu):    
+    def acts(self, uu, ll):    
+        """Computes the activation function given the internal varaiable uu
+        and the current threshold parameter ll."""
         if self.threshfunc.startswith('hard'):
             thresholded = tf.identity
         else:
-            thresholded = lambda xx: tf.add(xx, -self.thresh*tf.sign(xx))
+            thresholded = lambda xx: tf.add(xx, -tf.sign(xx)*ll)
 
         if self.threshfunc.endswith('pos') or self.threshfunc.endswith('rec'):
             rect = tf.identity
         else:
             rect = tf.abs
     
-        return tf.select(tf.greater(rect(uu), self.thresh),
+        return tf.select(tf.greater(rect(uu), ll),
                           thresholded(uu), tf.multiply(0.0,uu),
                             name='activity')
 
@@ -85,34 +87,40 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.thresh = tf.Variable(lam, trainable=False)
         
         self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
-        self.dropout_rate = tf.placeholder(tf.float32)
-        self.dropout_phi = self.dropout_rate*tf.nn.dropout(self.phi, self.dropout_rate)
 
         self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
 
         # LCA inference
-        self.lca_drive = tf.matmul(self.dropout_phi, tf.transpose(self.X))
-        self.lca_gram = (tf.matmul(self.dropout_phi, tf.transpose(self.dropout_phi)) - 
+        self.lca_drive = tf.matmul(self.phi, tf.transpose(self.X))
+        self.lca_gram = (tf.matmul(self.phi, tf.transpose(self.phi)) - 
             tf.constant(np.identity(int(self.nunits)),dtype=np.float32))
 
-        def next_u(old_u, ii):
-            lca_compet = tf.matmul(self.lca_gram, self.acts(old_u))
+        def next_u(old_u_l, ii):
+            old_u = old_u_l[0]
+            ll = old_u_l[1]
+            lca_compet = tf.matmul(self.lca_gram, self.acts(old_u, ll))
             du = self.lca_drive - lca_compet - old_u
-            return old_u + self.infrate*du
+            new_l = tf.constant(0.98)*ll
+            new_l = tf.select(tf.greater(new_l,self.thresh), 
+                                new_l,
+                                self.thresh*np.ones(self.batch_size))
+            return (old_u + self.infrate*du, new_l)
 
         self._itercount = tf.constant(np.arange(self.niter))
-        self._infu = tf.scan(next_u, self._itercount, initializer = tf.zeros([self.nunits,self.batch_size]))
+        init_u_l = (tf.zeros([self.nunits,self.batch_size]),
+                     0.5*tf.reduce_max(tf.abs(self.lca_drive),axis=0))
+        self._infu = tf.scan(next_u, self._itercount, initializer = init_u_l)[0]
         self.u = self._infu[-1]
         
         # for testing inference
-        self._infacts = self.acts(self._infu)
+        self._infacts = self.acts(self._infu, self.thresh)
         def mul_fn(someacts):
             return tf.matmul(tf.transpose(someacts), self.phi)
         self._infXhat = tf.map_fn(mul_fn, self._infacts)
         self._infresid = self.X - self._infXhat
         self._infmse = tf.reduce_sum(tf.square(self._infresid), axis=[1,2])/self.batch_size/self.stims.datasize
         
-        self.final_acts = self.acts(self.u)
+        self.final_acts = self.acts(self.u, self.thresh)
         self.Xhat = tf.matmul(tf.transpose(self.final_acts), self.phi)
         self.resid = self.X - self.Xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
@@ -141,9 +149,8 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.renorm_phi)
         
-    def train_step(self, droprate=0.2):
-        feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T,
-                        self.dropout_rate : droprate}
+    def train_step(self):
+        feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
         if self.snr_goal is None:
             op_list = [self.final_acts, self.learn_op, self.loss, self.mse, self.meanL1]
             acts, _, loss_value, mse_value, meanL1_value = self.sess.run(op_list, feed_dict=feed_dict)
@@ -155,9 +162,9 @@ class LCALearner(tf_sparsenet.Sparsenet):
     
         return acts, loss_value, mse_value, meanL1_value
 
-    def run(self, ntrials = 10000, droprate=0.2):
+    def run(self, ntrials = 10000):
         for tt in range(ntrials):
-            self.store_stats(*self.train_step(droprate=droprate))
+            self.store_stats(*self.train_step())
             if tt % 50 == 0:
                 print (tt)
                 if (tt % 1000 == 0 or tt+1 == ntrials) and tt!= 0:
@@ -167,18 +174,11 @@ class LCALearner(tf_sparsenet.Sparsenet):
                     except (ValueError, TypeError) as er:
                         print ('Failed to save parameters. ', er)
 
-    def snr(self, acts, feed_dict):
-        """Returns the signal-noise ratio for the given data and coefficients."""
-        data = feed_dict[self.X]
-        sig = np.var(data,axis=1)
-        noise = np.var(data - self.sess.run(self.Xhat, feed_dict=feed_dict), axis=1)
-        return np.mean(sig/noise)
-
     def test_inference(self):
         feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
-        acts, costs = self.sess.run([self.final_acts, self._infmse], feed_dict=feed_dict)
+        acts, costs, snr = self.sess.run([self.final_acts, self._infmse, self.snr_db], feed_dict=feed_dict)
         plt.plot(costs, 'b')
-        print("Final SNR: " + str(self.snr(acts, feed_dict)))
+        print("Final SNR: " + str(snr))
         return acts, costs
         
     def get_param_list(self):
