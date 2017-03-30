@@ -8,30 +8,34 @@ except:
 import tensorflow as tf
 import sparsenet
 
+
 class Sparsenet(sparsenet.Sparsenet):
-    """A sparse dictionary learner based on (Olshausen and Field, 1996). Uses a tensorflow backend."""
-    
+    """
+    A sparse dictionary learner based on (Olshausen and Field, 1996).
+    Uses a tensorflow backend.
+    """
+
     def __init__(self,
                  data,
                  datatype="image",
                  pca=None,
-                 nunits = 200,
-                 batch_size = 100,
-                 paramfile = None,
-                 moving_avg_rate = 0.01,
-                 stimshape = None,
-                 lam = 0.15,
-                 niter = 200,
-                 var_goal = 0.04,
+                 nunits=200,
+                 batch_size=100,
+                 paramfile=None,
+                 moving_avg_rate=0.01,
+                 stimshape=None,
+                 lam=0.15,
+                 niter=200,
+                 var_goal=0.04,
                  var_avg_rate=0.1,
-                 gain_rate = 0.01,
-                 infrate = 200.0,
-                 learnrate = 2.0):
+                 gain_rate=0.01,
+                 infrate=200.0,
+                 learnrate=2.0):
         """
         Parameters
         data        : [nsamples, ndim] numpy array of training data
         datatype    : (str) "image" or "spectro"
-        pca         : PCA object with inverse_transform(), or None if pca not used
+        pca         : PCA object with inverse_transform(), or None
         nunits      : (int) number of units in sparsenet model
         batch_size  : (int) number of samples in each batch for learning
         paramfile   : (str) filename for pickle file storing parameters
@@ -40,8 +44,8 @@ class Sparsenet(sparsenet.Sparsenet):
         lam         : (float) sparsity parameter; higher means more sparse
         niter       : (int) number of time steps in inference
         var_goal    : (float) target variance of activities
-        var_avg_rate: (float) rate for updating moving average activity variance
-        gain_rate   : (float) rate for updating gains to control activity variance
+        var_avg_rate: (float) rate for updating moving avg activity variance
+        gain_rate   : (float) rate for updating gains to fix activity variance
         infrate     : (float) gradient descent rate for inference
         learnrate   : (float) gradient descent rate for learning
         """
@@ -50,7 +54,8 @@ class Sparsenet(sparsenet.Sparsenet):
         self.batch_size = batch_size
         self.paramfile = paramfile
         self.moving_avg_rate = moving_avg_rate
-        self.stimshape = stimshape or ((16,16) if datatype == 'image' else (25,256))
+        self.stimshape = stimshape or ((16, 16) if datatype == 'image'
+                                       else (25, 256))
         self.lam = lam
         self.niter = niter
         self.var_goal = var_goal
@@ -58,7 +63,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.gain_rate = gain_rate
         self.infrate = infrate
         self.learnrate = learnrate
-        
+
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
         self.build_graph()
@@ -73,7 +78,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.L1acts = np.zeros(nunits)
         self.L2acts = np.zeros(nunits)
         self.meanacts = np.zeros_like(self.L0acts)
-    
+
     def store_stats(self, acts, loss_value, mse_value, meanL1_value):
         self.loss_history = np.append(self.loss_history, loss_value)
         self.mse_history = np.append(self.mse_history, mse_value)
@@ -84,41 +89,41 @@ class Sparsenet(sparsenet.Sparsenet):
         self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
         means = acts.mean(1)
         self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*means
-    
+
     def build_graph(self):
         self.infrate = tf.Variable(self.infrate, trainable=False)
         self.learnrate = tf.Variable(self.learnrate, trainable=False)
-        
+
         self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
         self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
         self.reset_acts = self.acts.assign(tf.zeros([self.nunits,self.batch_size]))
-        
+
         self.X = tf.Variable(tf.zeros([self.batch_size, self.stims.datasize]), trainable=False)
         self.Xhat = tf.matmul(tf.transpose(self.acts), self.phi)
         self.resid = self.X - self.Xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.acts))/self.batch_size
         self.loss = 0.5*self.mse + self.lam*self.meanL1/self.stims.datasize
-        
+
         inferer = tf.train.GradientDescentOptimizer(self.infrate)
         self.inf_op = inferer.minimize(self.loss, var_list=[self.acts])
-        
+
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
         learn_step = tf.Variable(0,name='learn_step', trainable=False)
         self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
-        
+
         self.ma_variances = tf.Variable(tf.ones(self.nunits), trainable=False)
         self.gains = tf.Variable(tf.ones(self.nunits), trainable=False)
         _, self.variances = tf.nn.moments(self.acts, axes=[1])
         self.update_variance = self.ma_variances.assign((1.-self.var_avg_rate)*self.ma_variances + self.var_avg_rate*self.variances)
         self.update_gains = self.gains.assign(self.gains*tf.pow(self.var_goal/self.ma_variances, self.gain_rate))
         self.renorm_phi = self.phi.assign((tf.expand_dims(self.gains,dim=1)*tf.nn.l2_normalize(self.phi, dim=1)))
-        
+
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         config = tf.ConfigProto(gpu_options=gpu_options)
         config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=config)
-        
+
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1)))
 
