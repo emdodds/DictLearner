@@ -8,7 +8,11 @@ Created on Wed Jan 25 13:53:03 2017
 import numpy as np
 import tensorflow as tf
 import tf_sparsenet
-import matplotlib.pyplot as plt
+# workaround for cluster issue
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    print('Failed to import matplotlib, plotting unavailable.')
 
 class LCALearner(tf_sparsenet.Sparsenet):
     
@@ -25,7 +29,8 @@ class LCALearner(tf_sparsenet.Sparsenet):
                  niter = 200,
                  infrate = 0.1,
                  learnrate = 2.0,
-                 snr_goal = None,
+                 snr_goal = None,,
+                 seek_snr_rate = 0.1,
                  threshfunc = 'hard'):
         """
         Sparse dictionary learner using the L1 or L0 locally competitive algorithm
@@ -57,6 +62,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.learnrate = learnrate
         self.threshfunc = threshfunc
         self.snr_goal = snr_goal
+        self.seek_snr_rate = seek_snr_rate
         
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
@@ -138,7 +144,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         if self.snr_goal is not None:
             snrconvert = tf.constant(np.log(10.0)/10.0, dtype=tf.float32)
             snr_ratio = self.snr/tf.exp(snrconvert*tf.constant(self.snr_goal,dtype=tf.float32))
-            self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio,0.1))
+            self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio,self.seek_snr_rate))
         self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
         
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
