@@ -29,7 +29,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
                  niter = 200,
                  infrate = 0.1,
                  learnrate = 2.0,
-                 snr_goal = None,,
+                 snr_goal = None,
                  seek_snr_rate = 0.1,
                  threshfunc = 'hard'):
         """
