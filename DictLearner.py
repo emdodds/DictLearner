@@ -9,9 +9,13 @@ Includes gradient descent on MSE energy function as a default learning method.
 """
 import numpy as np
 import pickle
-import matplotlib.pyplot as plt
+# the try/except block avoids an issue with the cluster
+try:
+    import matplotlib.pyplot as plt
+    from scipy import ndimage
+except ImportError:
+    print('Plotting and modulation plot unavailable.')
 import StimSet
-from scipy import ndimage
 
 class DictLearner(object):
 

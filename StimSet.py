@@ -5,8 +5,12 @@ Created on Thu Aug 20 18:23:08 2015
 @author: Eric Dodds
 """
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+# try/except block gets around an issue on the cluster
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+except ImportError:
+    print("Plotting unavailable.")
 
 class StimSet(object):
     def __init__(self, data, stimshape, batch_size=None):
