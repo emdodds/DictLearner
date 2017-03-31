@@ -110,7 +110,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
             ll = old_u_l[1]
             lca_compet = tf.matmul(self.lca_gram, self.acts(old_u, ll))
             du = self.lca_drive - lca_compet - old_u
-            new_l = tf.constant(0.98)*ll
+            new_l = tf.constant(0.98)*ll  # 0.98 lifted from Bruno's code
             new_l = tf.select(tf.greater(new_l,self.thresh), 
                                 new_l,
                                 self.thresh*np.ones(self.batch_size))
@@ -119,11 +119,13 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self._itercount = tf.constant(np.arange(self.niter))
         init_u_l = (tf.zeros([self.nunits,self.batch_size]),
                      0.5*tf.reduce_max(tf.abs(self.lca_drive),axis=0))
-        self._infu = tf.scan(next_u, self._itercount, initializer = init_u_l)[0]
+        self._inftraj = tf.scan(next_u, self._itercount, initializer = init_u_l)
+        self._infu = self._inftraj[0]
+        self._infl = self._inftraj[1]
         self.u = self._infu[-1]
         
         # for testing inference
-        self._infacts = self.acts(self._infu, self.thresh)
+        self._infacts = self.acts(self._infu, self._infl)
 
         def mul_fn(someacts):
             return tf.matmul(tf.transpose(someacts), self.phi)
@@ -136,7 +138,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.resid = self.X - self.Xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.final_acts))/self.batch_size
-        self.loss = 0.5*self.mse #+ self.lam*self.meanL1/self.stims.datasize
+        self.loss = 0.5*self.mse  # + self.lam*self.meanL1/self.stims.datasize
         
         #learner = tf.train.AdadeltaOptimizer(self.learnrate)
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
