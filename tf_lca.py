@@ -14,41 +14,45 @@ try:
 except ImportError:
     print('Failed to import matplotlib, plotting unavailable.')
 
+
 class LCALearner(tf_sparsenet.Sparsenet):
-    
+
     def __init__(self,
                  data,
                  datatype="image",
                  pca=None,
-                 nunits = 200,
-                 batch_size = 100,
-                 paramfile = None,
-                 moving_avg_rate = 0.01,
-                 stimshape = None,
-                 lam = 0.15,
-                 niter = 200,
-                 infrate = 0.1,
-                 learnrate = 2.0,
-                 snr_goal = None,
-                 seek_snr_rate = 0.1,
-                 threshfunc = 'hard'):
+                 nunits=200,
+                 batch_size=100,
+                 paramfile=None,
+                 moving_avg_rate=0.01,
+                 stimshape=None,
+                 lam=0.15,
+                 niter=200,
+                 infrate=0.1,
+                 learnrate=50.0,
+                 snr_goal=None,
+                 seek_snr_rate=0.1,
+                 threshfunc='hard'):
         """
-        Sparse dictionary learner using the L1 or L0 locally competitive algorithm
+        Sparse dictionary learner using the
+        L1 or L0 locally competitive algorithm
         from Rozell et al 2008 for inference.
-        
         Parameters
         data        : [nsamples, ndim] numpy array of training data
         datatype    : (str) "image" or "spectro"
-        pca         : PCA object with inverse_transform(), or None if pca not used
+        pca         : PCA object with inverse_transform(), or None
         nunits      : (int) number of units in sparsenet model
         batch_size  : (int) number of samples in each batch for learning
         paramfile   : (str) filename for pickle file storing parameters
         moving_avg_rate: (float) rate for updating average statistics
         stimshape   : (array-like) original shape of each training datum
         lam         : (float) sparsity parameter; higher means more sparse
-        niter       : (int) number of time steps in inference (not dynamically adjustable)
+        niter       : (int) number of time steps in inference (not adjustable)
         infrate     : (float) gradient descent rate for inference
         learnrate   : (float) gradient descent rate for learning
+                      loss gets divided by numinput, so make this larger
+        snr_goal    : (float) snr in dB, lam adjusted dynamically to match
+        seek_snr_rate : (float) rate parameter for adjusting lam as above
         threshfunc  : (str) specifies which thresholding function to use
         """
         # save input parameters
@@ -56,21 +60,21 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.batch_size = batch_size
         self.paramfile = paramfile
         self.moving_avg_rate = moving_avg_rate
-        self.stimshape = stimshape or ((16,16) if datatype == 'image' else (25,256))
+        self.stimshape = stimshape or ((16, 16) if datatype == 'image'
+                                       else (25, 256))
         self.infrate = infrate / batch_size
         self._niter = niter
         self.learnrate = learnrate
         self.threshfunc = threshfunc
         self.snr_goal = snr_goal
         self.seek_snr_rate = seek_snr_rate
-        
+
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
         self.build_graph(lam)
         self.initialize_stats()
-        
 
-    def acts(self, uu, ll):    
+    def acts(self, uu, ll):
         """Computes the activation function given the internal varaiable uu
         and the current threshold parameter ll."""
         if self.threshfunc.startswith('hard'):
@@ -120,6 +124,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         
         # for testing inference
         self._infacts = self.acts(self._infu, self.thresh)
+
         def mul_fn(someacts):
             return tf.matmul(tf.transpose(someacts), self.phi)
         self._infXhat = tf.map_fn(mul_fn, self._infacts)
@@ -165,43 +170,46 @@ class LCALearner(tf_sparsenet.Sparsenet):
             acts, _, loss_value, mse_value, meanL1_value,_ = self.sess.run(op_list, feed_dict=feed_dict)
 
         self.sess.run(self.renorm_phi)
-    
+
         return acts, loss_value, mse_value, meanL1_value
 
-    def run(self, ntrials = 10000):
+    def run(self, ntrials=10000):
         for tt in range(ntrials):
             self.store_stats(*self.train_step())
             if tt % 50 == 0:
-                print (tt)
-                if (tt % 1000 == 0 or tt+1 == ntrials) and tt!= 0:
+                print(tt)
+                if (tt % 1000 == 0 or tt+1 == ntrials) and tt != 0:
                     try:
-                        print ("Saving progress to " + self.paramfile)
+                        print("Saving progress to " + self.paramfile)
                         self.save()
                     except (ValueError, TypeError) as er:
-                        print ('Failed to save parameters. ', er)
+                        print('Failed to save parameters. ', er)
 
     def test_inference(self):
         feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
-        acts, costs, snr = self.sess.run([self.final_acts, self._infmse, self.snr_db], feed_dict=feed_dict)
+        acts, costs, snr = self.sess.run([self.final_acts,
+                                          self._infmse,
+                                          self.snr_db],
+                                         feed_dict=feed_dict)
         plt.plot(costs, 'b')
         print("Final SNR: " + str(snr))
         return acts, costs
-        
+
     def get_param_list(self):
         lrnrate = self.sess.run(self.learnrate)
         irate = self.sess.run(self.infrate)
-        return {'nunits' : self.nunits,
-        'batch_size' : self.batch_size,
-        'paramfile' : self.paramfile,
-        'lam' : self.lam,
-        'niter' : self.niter,
-        'infrate' : irate,
-        'learnrate' : lrnrate}
-        
+        return {'nunits': self.nunits,
+                'batch_size': self.batch_size,
+                'paramfile': self.paramfile,
+                'lam': self.lam,
+                'niter': self.niter,
+                'infrate': irate,
+                'learnrate': lrnrate}
+
     @property
     def lam(self):
         return self.sess.run(self.thresh)
-        
+
     @lam.setter
     def lam(self, lam):
         self.sess.run(self.thresh.assign(lam))
