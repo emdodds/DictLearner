@@ -125,7 +125,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.u = self._infu[-1]
         
         # for testing inference
-        self._infacts = self.acts(self._infu, self._infl)
+        self._infacts = self.acts(self._infu, tf.expand_dims(self._infl, 1))
 
         def mul_fn(someacts):
             return tf.matmul(tf.transpose(someacts), self.phi)
