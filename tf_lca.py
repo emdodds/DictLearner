@@ -62,7 +62,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.moving_avg_rate = moving_avg_rate
         self.stimshape = stimshape or ((16, 16) if datatype == 'image'
                                        else (25, 256))
-        self.infrate = infrate / batch_size
+        self.infrate = infrate
         self._niter = niter
         self.learnrate = learnrate
         self.threshfunc = threshfunc
@@ -96,13 +96,13 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.learnrate = tf.Variable(self.learnrate, trainable=False)
         self.thresh = tf.Variable(lam, trainable=False)
         
-        self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
+        self.phi = tf.Variable(tf.random_normal([self.nunits, self.stims.datasize]))
 
         self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
 
         # LCA inference
         self.lca_drive = tf.matmul(self.phi, tf.transpose(self.X))
-        self.lca_gram = (tf.matmul(self.phi, tf.transpose(self.phi)) - 
+        self.lca_gram = (tf.matmul(self.phi, tf.transpose(self.phi)) -
             tf.constant(np.identity(int(self.nunits)),dtype=np.float32))
 
         def next_u(old_u_l, ii):
@@ -119,7 +119,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self._itercount = tf.constant(np.arange(self.niter))
         init_u_l = (tf.zeros([self.nunits,self.batch_size]),
                      0.5*tf.reduce_max(tf.abs(self.lca_drive),axis=0))
-        self._inftraj = tf.scan(next_u, self._itercount, initializer = init_u_l)
+        self._inftraj = tf.scan(next_u, self._itercount, initializer=init_u_l)
         self._infu = self._inftraj[0]
         self._infl = self._inftraj[1]
         self.u = self._infu[-1]
