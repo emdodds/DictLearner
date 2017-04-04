@@ -177,7 +177,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
             acts, loss_value, mse_value, meanL1_value,_ = self.sess.run(op_list, feed_dict=feed_dict)
 
         feed_dict[self._learn_acts] = acts
-        self.sess.run([self.learn_op, self.seek_snr], feed_dict=feed_dict)
+        self.sess.run([self.learn_op], feed_dict=feed_dict)
 
         self.sess.run(self.renorm_phi)
 
