@@ -123,7 +123,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self._infu = self._inftraj[0]
         self._infl = self._inftraj[1]
         self.u = self._infu[-1]
-        
+
         # for testing inference
         self._infacts = self.acts(self._infu, tf.expand_dims(self._infl, 1))
 
@@ -131,45 +131,53 @@ class LCALearner(tf_sparsenet.Sparsenet):
             return tf.matmul(tf.transpose(someacts), self.phi)
         self._infXhat = tf.map_fn(mul_fn, self._infacts)
         self._infresid = self.X - self._infXhat
-        self._infmse = tf.reduce_sum(tf.square(self._infresid), axis=[1,2])/self.batch_size/self.stims.datasize
-        
+        self._infmse = tf.reduce_sum(tf.square(self._infresid), axis=[1, 2])/self.batch_size/self.stims.datasize
+
         self.final_acts = self.acts(self.u, self.thresh)
         self.Xhat = tf.matmul(tf.transpose(self.final_acts), self.phi)
         self.resid = self.X - self.Xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.final_acts))/self.batch_size
         self.loss = 0.5*self.mse  # + self.lam*self.meanL1/self.stims.datasize
-        
-        #learner = tf.train.AdadeltaOptimizer(self.learnrate)
+
+        # for learning, holding acts constant
+        self._learn_acts = tf.placeholder(tf.float32,
+                                          shape=[self.nunits, self.batch_size])
+        self._learn_Xhat = tf.matmul(tf.transpose(self._learn_acts), self.phi)
+        self._learn_resid = self.X - self._learn_Xhat
+        self._learn_mse = tf.reduce_sum(tf.square(self._learn_resid))/self.batch_size/self.stims.datasize
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
-        learn_step = tf.Variable(0,name='learn_step', trainable=False)
-        self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
-        
+        self.learn_op = learner.minimize(self._learn_mse,
+                                         var_list=[self.phi])
+
         self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1))
 
         self.snr = tf.reduce_mean(tf.square(self.X))/self.mse
         if self.snr_goal is not None:
             snrconvert = tf.constant(np.log(10.0)/10.0, dtype=tf.float32)
-            snr_ratio = self.snr/tf.exp(snrconvert*tf.constant(self.snr_goal,dtype=tf.float32))
-            self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio,self.seek_snr_rate))
+            snr_ratio = self.snr/tf.exp(snrconvert*tf.constant(self.snr_goal, dtype=tf.float32))
+            self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio, self.seek_snr_rate))
         self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
-        
+
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         config = tf.ConfigProto(gpu_options=gpu_options)
         config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=config)
-        
+
         self.sess.run(tf.global_variables_initializer())
         self.sess.run(self.renorm_phi)
-        
+
     def train_step(self):
         feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
         if self.snr_goal is None:
-            op_list = [self.final_acts, self.learn_op, self.loss, self.mse, self.meanL1]
-            acts, _, loss_value, mse_value, meanL1_value = self.sess.run(op_list, feed_dict=feed_dict)
+            op_list = [self.final_acts, self.loss, self.mse, self.meanL1]
+            acts, loss_value, mse_value, meanL1_value = self.sess.run(op_list, feed_dict=feed_dict)
         else:
-            op_list = [self.final_acts, self.learn_op, self.loss, self.mse, self.meanL1, self.seek_snr]
-            acts, _, loss_value, mse_value, meanL1_value,_ = self.sess.run(op_list, feed_dict=feed_dict)
+            op_list = [self.final_acts, self.loss, self.mse, self.meanL1, self.seek_snr]
+            acts, loss_value, mse_value, meanL1_value,_ = self.sess.run(op_list, feed_dict=feed_dict)
+
+        feed_dict[self._learn_acts] = acts
+        self.sess.run([self.learn_op, self.seek_snr], feed_dict=feed_dict)
 
         self.sess.run(self.renorm_phi)
 
