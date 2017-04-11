@@ -48,7 +48,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         stimshape   : (array-like) original shape of each training datum
         lam         : (float) sparsity parameter; higher means more sparse
         niter       : (int) number of time steps in inference (not adjustable)
-        infrate     : (float) gradient descent rate for inference
+        infrate     : (float) rate for inference
         learnrate   : (float) gradient descent rate for learning
                       loss gets divided by numinput, so make this larger
         snr_goal    : (float) snr in dB, lam adjusted dynamically to match
@@ -66,13 +66,20 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self._niter = niter
         self.learnrate = learnrate
         self.threshfunc = threshfunc
+        self.lam = lam
         self.snr_goal = snr_goal
         self.seek_snr_rate = seek_snr_rate
 
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
-        self.build_graph(lam)
+        self.Q = tf.random_normal([self.nunits, self.stims.datasize])
+        self.graph = self.build_graph()
         self.initialize_stats()
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+        self.config = tf.ConfigProto(gpu_options=gpu_options)
+        self.config.gpu_options.allow_growth = True
+        with tf.Session(graph=self.graph, config=self.config) as sess:
+            self.Q = sess.run(self.renorm_phi)
 
     def acts(self, uu, ll):
         """Computes the activation function given the internal varaiable uu
@@ -80,30 +87,37 @@ class LCALearner(tf_sparsenet.Sparsenet):
         if self.threshfunc.startswith('hard'):
             thresholded = tf.identity
         else:
-            thresholded = lambda xx: tf.add(xx, -tf.sign(xx)*ll)
+            def thresholded(prethresh):
+                return tf.add(prethresh, -tf.sign(prethresh)*ll)
 
         if self.threshfunc.endswith('pos') or self.threshfunc.endswith('rec'):
             rect = tf.identity
         else:
             rect = tf.abs
-    
+
         return tf.select(tf.greater(rect(uu), ll),
-                          thresholded(uu), tf.multiply(0.0,uu),
-                            name='activity')
+                         thresholded(uu), tf.multiply(0.0, uu),
+                         name='activity')
 
-    def build_graph(self, lam):
-        self.infrate = tf.Variable(self.infrate, trainable=False)
-        self.learnrate = tf.Variable(self.learnrate, trainable=False)
-        self.thresh = tf.Variable(lam, trainable=False)
-        
-        self.phi = tf.Variable(tf.random_normal([self.nunits, self.stims.datasize]))
+    def build_graph(self):
+        graph = tf.get_default_graph()
 
-        self.X = tf.placeholder(tf.float32, shape=[self.batch_size, self.stims.datasize])
+        self._infrate = tf.Variable(self.infrate, trainable=False)
+        self._learnrate = tf.Variable(self.learnrate, trainable=False)
+        self.thresh = tf.Variable(self.lam, trainable=False)
+
+        self.phi = tf.Variable(self.Q)
+
+        self.x = tf.placeholder(tf.float32,
+                                shape=[self.batch_size, self.stims.datasize])
+
+        self.final_acts = tf.Variable(tf.zeros([self.nunits, self.batch_size]))
 
         # LCA inference
-        self.lca_drive = tf.matmul(self.phi, tf.transpose(self.X))
+        self.lca_drive = tf.matmul(self.phi, tf.transpose(self.x))
         self.lca_gram = (tf.matmul(self.phi, tf.transpose(self.phi)) -
-            tf.constant(np.identity(int(self.nunits)),dtype=np.float32))
+                         tf.constant(np.identity(int(self.nunits)),
+                         dtype=np.float32))
 
         def next_u(old_u_l, ii):
             old_u = old_u_l[0]
@@ -111,14 +125,14 @@ class LCALearner(tf_sparsenet.Sparsenet):
             lca_compet = tf.matmul(self.lca_gram, self.acts(old_u, ll))
             du = self.lca_drive - lca_compet - old_u
             new_l = tf.constant(0.98)*ll  # 0.98 lifted from Bruno's code
-            new_l = tf.select(tf.greater(new_l,self.thresh), 
-                                new_l,
-                                self.thresh*np.ones(self.batch_size))
+            new_l = tf.select(tf.greater(new_l, self.thresh),
+                              new_l,
+                              self.thresh*np.ones(self.batch_size))
             return (old_u + self.infrate*du, new_l)
 
         self._itercount = tf.constant(np.arange(self.niter))
-        init_u_l = (tf.zeros([self.nunits,self.batch_size]),
-                     0.5*tf.reduce_max(tf.abs(self.lca_drive),axis=0))
+        init_u_l = (tf.zeros([self.nunits, self.batch_size]),
+                    0.5*tf.reduce_max(tf.abs(self.lca_drive), axis=0))
         self._inftraj = tf.scan(next_u, self._itercount, initializer=init_u_l)
         self._infu = self._inftraj[0]
         self._infl = self._inftraj[1]
@@ -129,109 +143,96 @@ class LCALearner(tf_sparsenet.Sparsenet):
 
         def mul_fn(someacts):
             return tf.matmul(tf.transpose(someacts), self.phi)
-        self._infXhat = tf.map_fn(mul_fn, self._infacts)
-        self._infresid = self.X - self._infXhat
-        self._infmse = tf.reduce_sum(tf.square(self._infresid), axis=[1, 2])/self.batch_size/self.stims.datasize
+        self._infxhat = tf.map_fn(mul_fn, self._infacts)
+        self._infresid = self.x - self._infxhat
+        self._infmse = tf.reduce_sum(tf.square(self._infresid), axis=[1, 2])
+        self._infmse = self._infmse/self.batch_size/self.stims.datasize
 
-        self.final_acts = self.acts(self.u, self.thresh)
-        self.Xhat = tf.matmul(tf.transpose(self.final_acts), self.phi)
-        self.resid = self.X - self.Xhat
-        self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
+        self.full_inference = self.final_acts.assign(self.acts(self.u,
+                                                               self.thresh))
+        self.xhat = tf.matmul(tf.transpose(self.final_acts), self.phi)
+        self.resid = self.x - self.xhat
+        self.mse = tf.reduce_sum(tf.square(self.resid))
+        self.mse = self.mse/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.final_acts))/self.batch_size
-        self.loss = 0.5*self.mse  # + self.lam*self.meanL1/self.stims.datasize
+        self.loss = 0.5*self.mse
 
-        # for learning, holding acts constant
-        self._learn_acts = tf.placeholder(tf.float32,
-                                          shape=[self.nunits, self.batch_size])
-        self._learn_Xhat = tf.matmul(tf.transpose(self._learn_acts), self.phi)
-        self._learn_resid = self.X - self._learn_Xhat
-        self._learn_mse = tf.reduce_sum(tf.square(self._learn_resid))/self.batch_size/self.stims.datasize
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
-        self.learn_op = learner.minimize(self._learn_mse,
+        self.learn_op = learner.minimize(self.loss,
                                          var_list=[self.phi])
 
         self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1))
 
-        self.snr = tf.reduce_mean(tf.square(self.X))/self.mse
+        self.snr = tf.reduce_mean(tf.square(self.x))/self.mse
         if self.snr_goal is not None:
-            snrconvert = tf.constant(np.log(10.0)/10.0, dtype=tf.float32)
-            snr_ratio = self.snr/tf.exp(snrconvert*tf.constant(self.snr_goal, dtype=tf.float32))
-            self.seek_snr = self.thresh.assign(self.thresh*tf.pow(snr_ratio, self.seek_snr_rate))
+            convert = tf.constant(np.log(10.0)/10.0, dtype=tf.float32)
+            snr_ratio = self.snr/tf.exp(convert*tf.constant(self.snr_goal,
+                                                            dtype=tf.float32))
+            self.seek_snr = self.thresh.assign(self.thresh *
+                                               tf.pow(snr_ratio,
+                                                      self.seek_snr_rate))
         self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
 
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
-        config = tf.ConfigProto(gpu_options=gpu_options)
-        config.gpu_options.allow_growth = True
-        self.sess = tf.Session(config=config)
+        return graph
 
-        self.sess.run(tf.global_variables_initializer())
-        self.sess.run(self.renorm_phi)
+    def train_step(self, sess):
+        feed_dict = {self.x: self.get_batch()}
 
-    def train_step(self):
-        feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
-        if self.snr_goal is None:
-            op_list = [self.final_acts, self.loss, self.mse, self.meanL1]
-            acts, loss_value, mse_value, meanL1_value = self.sess.run(op_list, feed_dict=feed_dict)
-        else:
-            op_list = [self.final_acts, self.loss, self.mse, self.meanL1, self.seek_snr]
-            acts, loss_value, mse_value, meanL1_value,_ = self.sess.run(op_list, feed_dict=feed_dict)
+        # run inference and get activities
+        acts = sess.run(self.full_inference, feed_dict=feed_dict)
 
-        feed_dict[self._learn_acts] = acts
-        self.sess.run([self.learn_op], feed_dict=feed_dict)
+        # get losses and update weights
+        op_list = [self.mse, self.meanL1, self.learn_op]
+        mse_value, meanL1_value, _ = sess.run(op_list,
+                                              feed_dict=feed_dict)
 
-        self.sess.run(self.renorm_phi)
+        # update lambda to seek reconstruction snr if specified
+        if self.snr_goal is not None:
+            sess.run(self.seek_snr, feed_dict=feed_dict)
 
-        return acts, loss_value, mse_value, meanL1_value
+        # normalize the weights
+        sess.run(self.renorm_phi)
+
+        return acts, 0.5*mse_value, mse_value, meanL1_value
 
     def run(self, ntrials=10000):
-        for tt in range(ntrials):
-            self.store_stats(*self.train_step())
-            if tt % 50 == 0:
-                print(tt)
-                if (tt % 1000 == 0 or tt+1 == ntrials) and tt != 0:
-                    try:
-                        print("Saving progress to " + self.paramfile)
-                        self.save()
-                    except (ValueError, TypeError) as er:
-                        print('Failed to save parameters. ', er)
+        with tf.Session(graph=self.graph, config=self.config) as sess:
+            sess.run(tf.global_variables_initializer())
+            sess.run([self.phi.assign(self.Q),
+                      self.thresh.assign(self.lam),
+                      self._infrate.assign(self.infrate),
+                      self._learnrate.assign(self.learnrate)])
+
+            for tt in range(ntrials):
+                self.store_stats(*self.train_step())
+                if tt % 50 == 0:
+                    print(tt)
+                    if (tt % 1000 == 0 or tt+1 == ntrials) and tt != 0:
+                        try:
+                            print("Saving progress to " + self.paramfile)
+                            self.save()
+                        except (ValueError, TypeError) as er:
+                            print('Failed to save parameters. ', er)
 
     def test_inference(self):
-        feed_dict = {self.X: self.stims.rand_stim(batch_size=self.batch_size).T}
-        acts, costs, snr = self.sess.run([self.final_acts,
-                                          self._infmse,
-                                          self.snr_db],
-                                         feed_dict=feed_dict)
+        feed_dict = {self.x: self.get_batch()}
+        with tf.Session(graph=self.graph, config=self.config) as sess:
+            acts, costs, snr = sess.run([self.full_inference,
+                                         self._infmse],
+                                        feed_dict=feed_dict)
+            snr = sess.run(self.snr_db, feed_dict=feed_dict)
         plt.plot(costs, 'b')
         print("Final SNR: " + str(snr))
         return acts, costs
 
+    def get_batch(self):
+        return self.stims.rand_stim(batch_size=self.batch_size).T
+
     def get_param_list(self):
-        lrnrate = self.sess.run(self.learnrate)
-        irate = self.sess.run(self.infrate)
         return {'nunits': self.nunits,
                 'batch_size': self.batch_size,
                 'paramfile': self.paramfile,
                 'lam': self.lam,
                 'niter': self.niter,
-                'infrate': irate,
-                'learnrate': lrnrate}
-
-    @property
-    def lam(self):
-        return self.sess.run(self.thresh)
-
-    @lam.setter
-    def lam(self, lam):
-        self.sess.run(self.thresh.assign(lam))
-
-    @property
-    def niter(self):
-        return self._niter
-
-    @niter.setter
-    def niter(self, value):
-        self._niter = value
-        self.build_graph(self.lam)
-
-    def feed_rand_batch(self):
-        raise AttributeError
+                'infrate': self.learnrate,
+                'learnrate': self.infrate}
