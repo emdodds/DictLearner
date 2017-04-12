@@ -231,3 +231,23 @@ class LCALearner(tf_sparsenet.Sparsenet):
                 'niter': self.niter,
                 'infrate': self.learnrate,
                 'learnrate': self.infrate}
+
+
+class LCALearnerTI(LCALearner):
+    """LCALearner with backprop through inference."""
+    def build_graph(self):
+        graph = super().build_graph()
+        self.full_inference = self.final_acts.assign(self.acts(self.u,
+                                                               self.thresh))
+        self.xhat = tf.matmul(tf.transpose(self.final_acts), self.phi)
+        self.resid = self.x - self.xhat
+        self.mse = tf.reduce_sum(tf.square(self.resid))
+        self.mse = self.mse/self.batch_size/self.stims.datasize
+        self.meanL1 = tf.reduce_sum(tf.abs(self.final_acts))/self.batch_size
+        self.loss = 0.5*self.mse
+
+        learner = tf.train.GradientDescentOptimizer(self.learnrate)
+        self.learn_op = learner.minimize(self.loss,
+                                         var_list=[self.phi])
+
+        return graph
