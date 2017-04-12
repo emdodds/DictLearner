@@ -63,7 +63,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.stimshape = stimshape or ((16, 16) if datatype == 'image'
                                        else (25, 256))
         self.infrate = infrate
-        self._niter = niter
+        self.niter = niter
         self.learnrate = learnrate
         self.threshfunc = threshfunc
         self.lam = lam
@@ -75,10 +75,12 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.Q = tf.random_normal([self.nunits, self.stims.datasize])
         self.graph = self.build_graph()
         self.initialize_stats()
+
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         self.config = tf.ConfigProto(gpu_options=gpu_options)
         self.config.gpu_options.allow_growth = True
         with tf.Session(graph=self.graph, config=self.config) as sess:
+            sess.run(tf.global_variables_initializer())
             self.Q = sess.run(self.renorm_phi)
 
     def acts(self, uu, ll):
@@ -195,38 +197,31 @@ class LCALearner(tf_sparsenet.Sparsenet):
 
         return acts, 0.5*mse_value, mse_value, meanL1_value
 
-    def run(self, ntrials=10000):
-        with tf.Session(graph=self.graph, config=self.config) as sess:
-            sess.run(tf.global_variables_initializer())
-            sess.run([self.phi.assign(self.Q),
-                      self.thresh.assign(self.lam),
-                      self._infrate.assign(self.infrate),
-                      self._learnrate.assign(self.learnrate)])
+    def initialize_vars(self, sess):
+        sess.run(tf.global_variables_initializer())
+        sess.run([self.phi.assign(self.Q),
+                  self.thresh.assign(self.lam),
+                  self._infrate.assign(self.infrate),
+                  self._learnrate.assign(self.learnrate)])
 
-            for tt in range(ntrials):
-                self.store_stats(*self.train_step())
-                if tt % 50 == 0:
-                    print(tt)
-                    if (tt % 1000 == 0 or tt+1 == ntrials) and tt != 0:
-                        try:
-                            print("Saving progress to " + self.paramfile)
-                            self.save()
-                        except (ValueError, TypeError) as er:
-                            print('Failed to save parameters. ', er)
+    def retrieve_vars(self, sess):
+        """Retrieve values from tf graph."""
+        stuff = sess.run([self.phi,
+                          self._infrate,
+                          self._learnrate])
+        self.Q, self.infrate, self.learnrate = stuff
 
     def test_inference(self):
         feed_dict = {self.x: self.get_batch()}
         with tf.Session(graph=self.graph, config=self.config) as sess:
-            acts, costs, snr = sess.run([self.full_inference,
-                                         self._infmse],
-                                        feed_dict=feed_dict)
+            self.initialize_vars(sess)
+            acts, costs = sess.run([self.full_inference,
+                                    self._infmse],
+                                   feed_dict=feed_dict)
             snr = sess.run(self.snr_db, feed_dict=feed_dict)
         plt.plot(costs, 'b')
         print("Final SNR: " + str(snr))
         return acts, costs
-
-    def get_batch(self):
-        return self.stims.rand_stim(batch_size=self.batch_size).T
 
     def get_param_list(self):
         return {'nunits': self.nunits,

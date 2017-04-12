@@ -29,7 +29,7 @@ class Sparsenet(sparsenet.Sparsenet):
                  var_goal=0.04,
                  var_avg_rate=0.1,
                  gain_rate=0.01,
-                 infrate=200.0,
+                 infrate=0.1,
                  learnrate=2.0):
         """
         Parameters
@@ -66,8 +66,19 @@ class Sparsenet(sparsenet.Sparsenet):
 
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
-        self.build_graph()
+        self.Q = tf.random_normal([self.nunits, self.stims.datasize])
+        self.ma_variances = tf.ones(self.nunits)
+        self.gains = tf.ones(self.nunits)
+        self.graph = self.build_graph()
         self.initialize_stats()
+
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
+        self.config = tf.ConfigProto(gpu_options=gpu_options)
+        self.config.gpu_options.allow_growth = True
+        with tf.Session(graph=self.graph, config=self.config) as sess:
+            sess.run(tf.global_variables_initializer())
+            self.Q = sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi,
+                                                                 dim=1)))
 
     def initialize_stats(self):
         self.loss_history = np.array([])
@@ -80,91 +91,123 @@ class Sparsenet(sparsenet.Sparsenet):
         self.meanacts = np.zeros_like(self.L0acts)
 
     def store_stats(self, acts, loss_value, mse_value, meanL1_value):
+        eta = self.moving_avg_rate
         self.loss_history = np.append(self.loss_history, loss_value)
         self.mse_history = np.append(self.mse_history, mse_value)
         self.L1_history = np.append(self.L1_history, meanL1_value/self.nunits)
-        self.L2acts = (1-self.moving_avg_rate)*self.L2acts + self.moving_avg_rate*(acts**2).mean(1)
-        self.L1acts = (1-self.moving_avg_rate)*self.L1acts + self.moving_avg_rate*np.abs(acts).mean(1)
+        self.L2acts = (1-eta)*self.L2acts + eta*(acts**2).mean(1)
+        self.L1acts = (1-eta)*self.L1acts + eta*np.abs(acts).mean(1)
         L0means = np.mean(acts != 0, axis=1)
-        self.L0acts = (1-self.moving_avg_rate)*self.L0acts + self.moving_avg_rate*L0means
+        self.L0acts = (1-eta)*self.L0acts + eta*L0means
         means = acts.mean(1)
-        self.meanacts = (1-self.moving_avg_rate)*self.meanacts + self.moving_avg_rate*means
+        self.meanacts = (1-eta)*self.meanacts + eta*means
 
     def build_graph(self):
-        self.infrate = tf.Variable(self.infrate, trainable=False)
-        self.learnrate = tf.Variable(self.learnrate, trainable=False)
+        graph = tf.get_default_graph()
 
-        self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
-        self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
-        self.reset_acts = self.acts.assign(tf.zeros([self.nunits,self.batch_size]))
+        self._infrate = tf.Variable(self.infrate, trainable=False)
+        self._learnrate = tf.Variable(self.learnrate, trainable=False)
 
-        self.X = tf.Variable(tf.zeros([self.batch_size, self.stims.datasize]), trainable=False)
-        self.Xhat = tf.matmul(tf.transpose(self.acts), self.phi)
-        self.resid = self.X - self.Xhat
-        self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
+        self.phi = tf.Variable(self.Q)
+        self.acts = tf.Variable(tf.zeros([self.nunits, self.batch_size]))
+        self.reset_acts = self.acts.assign(tf.zeros([self.nunits,
+                                                     self.batch_size]))
+
+        self.x = tf.Variable(tf.zeros([self.batch_size, self.stims.datasize]),
+                             trainable=False)
+        self.xhat = tf.matmul(tf.transpose(self.acts), self.phi)
+        self.resid = self.x - self.xhat
+        self.mse = tf.reduce_sum(tf.square(self.resid))
+        self.mse = self.mse/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.acts))/self.batch_size
         self.loss = 0.5*self.mse + self.lam*self.meanL1/self.stims.datasize
 
-        inferer = tf.train.GradientDescentOptimizer(self.infrate)
+        self.snr = tf.reduce_mean(tf.square(self.x))/self.mse
+        self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
+
+        inffactor = self.batch_size*self.stims.datasize
+        inferer = tf.train.GradientDescentOptimizer(self._infrate*inffactor)
         self.inf_op = inferer.minimize(self.loss, var_list=[self.acts])
 
-        learner = tf.train.GradientDescentOptimizer(self.learnrate)
-        learn_step = tf.Variable(0,name='learn_step', trainable=False)
-        self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
+        learner = tf.train.GradientDescentOptimizer(self._learnrate)
+        self.learn_op = learner.minimize(self.loss, var_list=[self.phi])
 
-        self.ma_variances = tf.Variable(tf.ones(self.nunits), trainable=False)
-        self.gains = tf.Variable(tf.ones(self.nunits), trainable=False)
+        self._ma_variances = tf.Variable(self.ma_variances, trainable=False)
+        self._gains = tf.Variable(self.gains, trainable=False)
         _, self.variances = tf.nn.moments(self.acts, axes=[1])
-        self.update_variance = self.ma_variances.assign((1.-self.var_avg_rate)*self.ma_variances + self.var_avg_rate*self.variances)
-        self.update_gains = self.gains.assign(self.gains*tf.pow(self.var_goal/self.ma_variances, self.gain_rate))
-        self.renorm_phi = self.phi.assign((tf.expand_dims(self.gains,dim=1)*tf.nn.l2_normalize(self.phi, dim=1)))
+        vareta = self.var_avg_rate
+        newvar = (1.-vareta)*self._ma_variances + vareta*self.variances
+        self.update_variance = self._ma_variances.assign(newvar)
+        newgain = self.gains*tf.pow(self.var_goal/self._ma_variances,
+                                    self.gain_rate)
+        self.update_gains = self._gains.assign(newgain)
+        normphi = (tf.expand_dims(self._gains,
+                                  dim=1)*tf.nn.l2_normalize(self.phi, dim=1))
+        self.renorm_phi = self.phi.assign(normphi)
 
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
-        config = tf.ConfigProto(gpu_options=gpu_options)
-        config.gpu_options.allow_growth = True
-        self.sess = tf.Session(config=config)
+        return graph
 
-        self.sess.run(tf.global_variables_initializer())
-        self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1)))
-
-    def feed_rand_batch(self):
-        self.sess.run(self.X.assign(self.stims.rand_stim(batch_size=self.batch_size).T))
-
-    def train_step(self):
-        self.feed_rand_batch()
-        self.sess.run(self.reset_acts)
+    def train_step(self, sess):
+        sess.run(self.x.assign(self.get_batch()))
+        sess.run(self.reset_acts)
         for ii in range(self.niter):
-            self.sess.run([self.inf_op, self.loss])
-        
-        _, loss_value, mse_value, meanL1_value = self.sess.run([self.learn_op, self.loss, self.mse, self.meanL1])
-        
-        self.sess.run(self.update_variance)
-        self.sess.run(self.update_gains)
-        self.sess.run(self.renorm_phi)
-    
-        return self.sess.run(self.acts), loss_value, mse_value, meanL1_value
+            sess.run([self.inf_op, self.loss])
+        oplist = [self.learn_op, self.loss, self.mse, self.meanL1]
+        _, loss_value, mse_value, meanL1_value = sess.run(oplist)
+
+        sess.run(self.update_variance)
+        sess.run(self.update_gains)
+        sess.run(self.renorm_phi)
+
+        return sess.run(self.acts), loss_value, mse_value, meanL1_value
+
+    def initialize_vars(self, sess):
+        """Initializes values of tf Variables."""
+        sess.run(tf.global_variables_initializer())
+        sess.run([self.phi.assign(self.Q),
+                  self._infrate.assign(self.infrate),
+                  self._learnrate.assign(self.learnrate),
+                  self._ma_variances.assign(self.ma_variances),
+                  self._gains.assign(self.gains)])
+
+    def retrieve_vars(self, sess):
+        """Retrieve values from tf graph."""
+        stuff = sess.run([self.phi,
+                          self._infrate,
+                          self._learnrate,
+                          self._ma_variances,
+                          self._gains])
+        (self.Q, self.infrate,
+         self.learnrate, self.ma_variances, self.gains) = stuff
 
     def run(self, nbatches=1000):
-        for tt in range(nbatches):
-            self.store_stats(*self.train_step())
-            if tt % 50 == 0:
-                print (tt)
-                if (tt % 1000 == 0 or tt+1 == nbatches) and tt!= 0:
-                    try:
-                        print ("Saving progress to " + self.paramfile)
-                        self.save()
-                    except (ValueError, TypeError) as er:
-                        print ('Failed to save parameters. ', er)
+        with tf.Session(config=self.config, graph=self.graph) as sess:
+            self.initialize_vars(sess)
+            for tt in range(nbatches):
+                self.store_stats(*self.train_step(sess))
+                if tt % 50 == 0:
+                    print(tt)
+                    self.retrieve_vars(sess)
+                    if (tt % 1000 == 0 or tt+1 == nbatches) and tt != 0:
+                        try:
+                            print("Saving progress to " + self.paramfile)
+                            self.save()
+                        except (ValueError, TypeError) as er:
+                            print('Failed to save parameters. ', er)
+            self.retrieve_vars(sess)
 
     def show_dict(self, cmap='RdBu', subset=None, layout='sqrt', savestr=None):
-        """Plot an array of tiled dictionary elements. The 0th element is in the top right."""
-        Qs = self.sess.run(self.phi)
+        """Plot an array of tiled dictionary elements.
+        The 0th element is in the top right."""
         if subset is not None:
             indices = np.random.choice(self.nunits, subset)
-            Qs = Qs[np.sort(indices)]
+            Qs = self.Q[np.sort(indices)]
+        else:
+            Qs = self.Q
         array = self.stims.stimarray(Qs[::-1], layout=layout)
         plt.figure()
-        arrayplot = plt.imshow(array,interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
+        arrayplot = plt.imshow(array, interpolation='nearest', cmap=cmap,
+                               aspect='auto', origin='lower')
         plt.axis('off')
         plt.colorbar()
         if savestr is not None:
@@ -172,9 +215,10 @@ class Sparsenet(sparsenet.Sparsenet):
         return arrayplot
 
     def show_element(self, index, cmap='jet', labels=None, savestr=None):
-        elem = self.stims.stim_for_display(self.sess.run(self.phi)[index])
+        elem = self.stims.stim_for_display(self.Q[index])
         plt.figure()
-        plt.imshow(elem.T, interpolation='nearest',cmap=cmap, aspect='auto', origin='lower')
+        plt.imshow(elem.T, interpolation='nearest', cmap=cmap,
+                   aspect='auto', origin='lower')
         if labels is None:
             plt.axis('off')
         else:
@@ -183,48 +227,38 @@ class Sparsenet(sparsenet.Sparsenet):
             plt.savefig(savestr, bbox_inches='tight')
 
     def test_inference(self):
-        self.feed_rand_batch()
         costs = np.zeros(self.niter)
-        self.sess.run(self.reset_acts)
-        for ii in range(self.niter):
-            _, costs[ii] = self.sess.run([self.inf_op, self.loss])
-        plt.plot(costs, 'b')
-        print("Final SNR: " + str(self.snr()))
-        return (self.sess.run(self.acts), costs)
+        with tf.Session(config=self.config, graph=self.graph) as sess:
+            self.initialize_vars(sess)
+            sess.run(self.x.assign(self.get_batch()))
+            sess.run(self.reset_acts)
+            for ii in range(self.niter):
+                _, costs[ii] = sess.run([self.inf_op, self.loss])
+            plt.plot(costs, 'b')
+            print("Final SNR: " + str(sess.run(self.snr_db)))
+            finalacts = sess.run(self.acts)
+        return (finalacts, costs)
 
-    def snr(self):
-        """Returns the signal-noise ratio for the current data and current coefficients."""
-        data = self.sess.run(self.X)
-        sig = np.var(data,axis=1)
-        noise = np.var(data - self.sess.run(self.Xhat), axis=1)
-        return np.mean(sig/noise)
-    
+    def get_batch(self):
+        return self.stims.rand_stim(batch_size=self.batch_size).T
+
     def progress_plot(self, window_size=1000, norm=1, start=0, end=-1):
-        """Plots a moving average of the error and activity history with the given averaging window."""
+        """Plots a moving average of the error and activity history with
+        the given averaging window."""
         window = np.ones(int(window_size))/float(window_size)
-        smoothederror = np.convolve(self.mse_history[start:end], window, 'valid')
-        smoothedactivity = np.convolve(self.L1_history[start:end], window, 'valid')
+        smoothederror = np.convolve(self.mse_history[start:end], window,
+                                    'valid')
+        smoothedactivity = np.convolve(self.L1_history[start:end], window,
+                                       'valid')
         plt.plot(smoothederror, 'b', smoothedactivity, 'g')
-    
-    def set_infrate(self, infrate):
-        self.sess.run(self.infrate.assign(infrate))
 
-    def get_infrate(self):
-        return self.sess.run(self.infrate)
-    
-    def set_learnrate(self, learnrate):
-        self.sess.run(self.learnrate.assign(learnrate))
-
-    def get_learnrate(self):
-        return self.sess.run(self.learnrate)
-    
     def adjust_rates(self, factor):
-        self.set_infrate(self.sess.run(factor*self.infrate))
-        self.set_learnrate(self.sess.run(factor*self.learnrate))
-    
-    def sort_dict(self, batch_size=None, plot = False, allstims = True, savestr=None):
+        self.infrate = factor*self.infrate
+        self.learnrate = factor*self.learnrate
+
+    def sort_dict(self, **kwargs):
         raise NotImplementedError
-    
+
     def sort(self, usages, sorter, plot=False, savestr=None):
         self.Q = self.Q[sorter]
         self.L0acts = self.L0acts[sorter]
@@ -238,52 +272,39 @@ class Sparsenet(sparsenet.Sparsenet):
             plt.xlabel('Dictionary index')
             plt.ylabel('Fraction of stimuli')
             if savestr is not None:
-                plt.savefig(savestr,format='png', bbox_inches='tight')
-    
+                plt.savefig(savestr, format='png', bbox_inches='tight')
+
     def get_param_list(self):
-        lrnrate = self.sess.run(self.learnrate)
-        irate = self.sess.run(self.infrate)
-        gains = self.sess.run(self.gains)
-        variances = self.sess.run(self.ma_variances)
-        return {'nunits' : self.nunits,
-        'batch_size' : self.batch_size,
-        'paramfile' : self.paramfile,
-        'lam' : self.lam,
-        'niter' : self.niter,
-        'var_goal' : self.var_goal,
-        'var_avg_rate' : self.var_avg_rate,
-        'gain_rate' : self.gain_rate,
-        'infrate' : irate,
-        'learnrate' : lrnrate,
-        'gains' : gains,
-        'variances' : variances}
+        return {'nunits': self.nunits,
+                'batch_size': self.batch_size,
+                'paramfile': self.paramfile,
+                'lam': self.lam,
+                'niter': self.niter,
+                'var_goal': self.var_goal,
+                'var_avg_rate': self.var_avg_rate,
+                'gain_rate': self.gain_rate,
+                'infrate': self.infrate,
+                'learnrate': self.learnrate,
+                'gains': self.gains,
+                'ma_variances': self.ma_variances}
 
     def set_params(self, params):
         for key, val in params.items():
-            if key == 'infrate':
-                self.sess.run(self.infrate.assign(val))
-            elif key == 'learnrate':
-                self.sess.run(self.learnrate.assign(val))
-            elif key == 'gains':
-                self.sess.run(self.gains.assign(val))
-            elif key == 'variances':
-                self.sess.run(self.ma_variances.assign(val))
-            else:
-                try:
-                    getattr(self,key)
-                except AttributeError:
-                    print('Unexpected parameter passed: ' + key)
-                    setattr(self, key, val)
+            try:
+                getattr(self, key)
+            except AttributeError:
+                print('Unexpected parameter passed: ' + key)
+                setattr(self, key, val)
 
     def get_histories(self):
-        return {'loss' : self.loss_history,
+        return {'loss': self.loss_history,
                 'mse': self.mse_history,
-                'L1' : self.L1_history,
-                'L0acts' : self.L0acts,
-                'L1acts' : self.L1acts,
-                'L2acts' : self.L2acts,
-                'meanacts' : self.meanacts}
-    
+                'L1': self.L1_history,
+                'L0acts': self.L0acts,
+                'L1acts': self.L1acts,
+                'L2acts': self.L2acts,
+                'meanacts': self.meanacts}
+
     def set_histories(self, histories):
         self.loss_history = histories['loss']
         self.mse_history = histories['mse']
@@ -292,12 +313,3 @@ class Sparsenet(sparsenet.Sparsenet):
         self.L1acts = histories['L1acts']
         self.L2acts = histories['L2acts']
         self.meanacts = histories['meanacts']
-    
-    @property
-    def Q(self):
-        """Q is just a different notation for the dictionary. Used for compatability with DictLearner methods."""
-        return self.sess.run(self.phi)
-    
-    @Q.setter
-    def Q(self, value):
-        self.sess.run(self.phi.assign(value))
