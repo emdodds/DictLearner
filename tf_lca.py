@@ -325,8 +325,8 @@ class LCALearnerTI(LCALearner):
 
         op_list = [self.final_acts, self.mse, self.meanL1, self.learn_op,
                    self.seek_snr]
-        acts, mse_value, meanL1_value, _ = sess.run(op_list,
-                                                    feed_dict=feed_dict)
+        acts, mse_value, meanL1_value, _, _ = sess.run(op_list,
+                                                       feed_dict=feed_dict)
 
         # normalize the weights
         sess.run(self.renorm_phi)
