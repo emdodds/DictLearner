@@ -236,17 +236,99 @@ class LCALearner(tf_sparsenet.Sparsenet):
 class LCALearnerTI(LCALearner):
     """LCALearner with backprop through inference."""
     def build_graph(self):
-        graph = super().build_graph()
-        self.final_acts = self.u
+        graph = tf.get_default_graph()
+
+        self._infrate = tf.Variable(self.infrate, trainable=False)
+        self._learnrate = tf.Variable(self.learnrate, trainable=False)
+        self.thresh = tf.Variable(self.lam, trainable=False)
+
+        self.phi = tf.Variable(self.Q)
+
+        self.x = tf.placeholder(tf.float32,
+                                shape=[self.batch_size, self.stims.datasize])
+
+        # LCA inference
+        self.lca_drive = tf.matmul(self.phi, tf.transpose(self.x))
+        self.lca_gram = (tf.matmul(self.phi, tf.transpose(self.phi)) -
+                         tf.constant(np.identity(int(self.nunits)),
+                         dtype=np.float32))
+
+        def next_u(old_u_l, ii):
+            old_u = old_u_l[0]
+            ll = old_u_l[1]
+            lca_compet = tf.matmul(self.lca_gram, self.acts(old_u, ll))
+            du = self.lca_drive - lca_compet - old_u
+            new_l = tf.constant(0.98)*ll  # 0.98 lifted from Bruno's code
+            new_l = tf.select(tf.greater(new_l, self.thresh),
+                              new_l,
+                              self.thresh*np.ones(self.batch_size))
+            return (old_u + self.infrate*du, new_l)
+
+        self._itercount = tf.constant(np.arange(self.niter))
+        init_u_l = (tf.zeros([self.nunits, self.batch_size]),
+                    0.5*tf.reduce_max(tf.abs(self.lca_drive), axis=0))
+        self._inftraj = tf.scan(next_u, self._itercount, initializer=init_u_l)
+        self._infu = self._inftraj[0]
+        self._infl = self._inftraj[1]
+        self.u = self._infu[-1]
+
+        # for testing inference
+        self._infacts = self.acts(self._infu, tf.expand_dims(self._infl, 1))
+
+        def mul_fn(someacts):
+            return tf.matmul(tf.transpose(someacts), self.phi)
+        self._infxhat = tf.map_fn(mul_fn, self._infacts)
+        self._infresid = self.x - self._infxhat
+        self._infmse = tf.reduce_sum(tf.square(self._infresid), axis=[1, 2])
+        self._infmse = self._infmse/self.batch_size/self.stims.datasize
+
+        self.final_acts = self.acts(self.u, self.thresh)
         self.xhat = tf.matmul(tf.transpose(self.final_acts), self.phi)
         self.resid = self.x - self.xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))
         self.mse = self.mse/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.final_acts))/self.batch_size
-        self.loss = 0.5*self.mse + self.lam*self.meanL1/self.stims.datasize
+        self.loss = 0.5*self.mse
 
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
         self.learn_op = learner.minimize(self.loss,
                                          var_list=[self.phi])
 
+        self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1))
+
+        self.snr = tf.reduce_mean(tf.square(self.x))/self.mse
+        if self.snr_goal is not None:
+            convert = tf.constant(np.log(10.0)/10.0, dtype=tf.float32)
+            snr_ratio = self.snr/tf.exp(convert*tf.constant(self.snr_goal,
+                                                            dtype=tf.float32))
+            self.seek_snr = self.thresh.assign(self.thresh *
+                                               tf.pow(snr_ratio,
+                                                      self.seek_snr_rate))
+        self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
+
         return graph
+
+    def test_inference(self):
+        feed_dict = {self.x: self.get_batch()}
+        with tf.Session(graph=self.graph, config=self.config) as sess:
+            self.initialize_vars(sess)
+            acts, costs = sess.run([self.final_acts,
+                                    self._infmse],
+                                   feed_dict=feed_dict)
+            snr = sess.run(self.snr_db, feed_dict=feed_dict)
+        plt.plot(costs, 'b')
+        print("Final SNR: " + str(snr))
+        return acts, costs
+
+    def train_step(self, sess):
+        feed_dict = {self.x: self.get_batch()}
+
+        op_list = [self.final_acts, self.mse, self.meanL1, self.learn_op,
+                   self.seek_snr]
+        acts, mse_value, meanL1_value, _ = sess.run(op_list,
+                                                    feed_dict=feed_dict)
+
+        # normalize the weights
+        sess.run(self.renorm_phi)
+
+        return acts, 0.5*mse_value, mse_value, meanL1_value
