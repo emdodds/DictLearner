@@ -236,7 +236,8 @@ class LCALearner(tf_sparsenet.Sparsenet):
 
 
 class LCALearnerTI(LCALearner):
-    """LCALearner with backprop through inference."""
+    """LCALearner with backprop through inference.
+    Currently only supports soft threshold."""
     def build_graph(self):
         graph = tf.get_default_graph()
 
@@ -290,7 +291,8 @@ class LCALearnerTI(LCALearner):
         self.mse = tf.reduce_sum(tf.square(self.resid))
         self.mse = self.mse/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.final_acts))/self.batch_size
-        self.loss = 0.5*self.mse
+        # with gradients evaluated through a/u, we need to keep the sparsity
+        self.loss = 0.5*self.mse + self.lam*self.meanL1/self.stims.datasize
 
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
         self.learn_op = learner.minimize(self.loss,
