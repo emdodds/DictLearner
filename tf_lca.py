@@ -202,14 +202,16 @@ class LCALearner(tf_sparsenet.Sparsenet):
         sess.run([self.phi.assign(self.Q),
                   self.thresh.assign(self.lam),
                   self._infrate.assign(self.infrate),
-                  self._learnrate.assign(self.learnrate)])
+                  self._learnrate.assign(self.learnrate),
+                  self.thresh.assign(self.lam)])
 
     def retrieve_vars(self, sess):
         """Retrieve values from tf graph."""
         stuff = sess.run([self.phi,
                           self._infrate,
-                          self._learnrate])
-        self.Q, self.infrate, self.learnrate = stuff
+                          self._learnrate,
+                          self.thresh])
+        self.Q, self.infrate, self.learnrate, self.lam = stuff
 
     def test_inference(self):
         feed_dict = {self.x: self.get_batch()}
