@@ -213,8 +213,11 @@ class LCALearner(tf_sparsenet.Sparsenet):
                           self.thresh])
         self.Q, self.infrate, self.learnrate, self.lam = stuff
 
-    def test_inference(self):
-        feed_dict = {self.x: self.get_batch()}
+    def test_inference(self, x=None):
+        if x is None:
+            feed_dict = {self.x: self.get_batch()}
+        else:
+            feed_dict = {self.x: x}
         with tf.Session(graph=self.graph, config=self.config) as sess:
             self.initialize_vars(sess)
             acts, costs = sess.run([self.full_inference,
@@ -312,8 +315,11 @@ class LCALearnerTI(LCALearner):
 
         return graph
 
-    def test_inference(self):
-        feed_dict = {self.x: self.get_batch()}
+    def test_inference(self, x=None):
+        if x is None:
+            feed_dict = {self.x: self.get_batch()}
+        else:
+            feed_dict = {self.x: x}
         with tf.Session(graph=self.graph, config=self.config) as sess:
             self.initialize_vars(sess)
             acts, costs = sess.run([self.final_acts,
