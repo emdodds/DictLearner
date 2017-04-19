@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, print_function
+from builtins import (bytes, str, open, super, range,
+                      zip, round, input, int, pow, object)
 
 import tensorflow as tf
 import tf_sparsenet
@@ -55,51 +58,51 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         nunits = self.topo.ncomponents * nunits
         try:
             kwargs['lam']
-            super().__init__(data, nunits=nunits, datatype = datatype, pca = pca, **kwargs)
+            super().__init__(data, nunits=nunits, datatype=datatype, pca=pca, **kwargs)
         except KeyError:
             super().__init__(data, nunits=nunits, datatype = datatype, pca = pca, lam=0, **kwargs)
 
     def build_graph(self):
+        graph = tf.get_default_graph()
+
         self.g = tf.constant(self.topo.get_matrix(), dtype=tf.float32)
         
-        self.infrate = tf.Variable(self.infrate, trainable=False)
-        self.learnrate = tf.Variable(self.learnrate, trainable=False)
+        self._infrate = tf.Variable(self.infrate, trainable=False)
+        self._learnrate = tf.Variable(self.learnrate, trainable=False)
         
-        self.phi = tf.Variable(tf.random_normal([self.nunits,self.stims.datasize]))
+        self.phi = tf.Variable(self.Q)
         self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
         self.reset_acts = self.acts.assign(tf.zeros([self.nunits,self.batch_size]))
         
-        self.X = tf.Variable(tf.zeros([self.batch_size, self.stims.datasize]), trainable=False)
-        self.Xhat = tf.matmul(tf.transpose(self.acts), self.phi, name='Xhat')
-        self.resid = self.X - self.Xhat
+        self.x = tf.Variable(tf.zeros([self.batch_size, self.stims.datasize]), trainable=False)
+        self.xhat = tf.matmul(tf.transpose(self.acts), self.phi, name='xhat')
+        self.resid = self.x - self.xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.acts))/self.batch_size
         self.layer2 = tf.reduce_sum(tf.sqrt(tf.matmul(self.g,tf.square(self.acts),
             name='g_times_acts') + self.epsilon))/self.batch_size
         self.loss = 0.5*self.mse + (self.lam*self.meanL1 + self.lam_g*self.layer2)/self.stims.datasize
         
-        inferer = tf.train.GradientDescentOptimizer(self.infrate)
-        inf_step = tf.Variable(0, name='inf_step', trainable=False)
-        self.inf_op = inferer.minimize(self.loss, global_step=inf_step, var_list=[self.acts])
+        inffactor = self.batch_size*self.stims.datasize
+        inferer = tf.train.GradientDescentOptimizer(self._infrate*inffactor)
+        self.inf_op = inferer.minimize(self.loss, var_list=[self.acts])
         
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
         learn_step = tf.Variable(0,name='learn_step', trainable=False)
         self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
         
-        self.ma_variances = tf.Variable(tf.ones(self.nunits), trainable=False)
-        self.gains = tf.Variable(tf.ones(self.nunits), trainable=False)
+        self._ma_variances = tf.Variable(self.ma_variances, trainable=False)
+        self._gains = tf.Variable(self.gains, trainable=False)
         _, self.variances = tf.nn.moments(self.acts, axes=[1])
-        self.update_variance = self.ma_variances.assign((1.-self.var_avg_rate)*self.ma_variances + self.var_avg_rate*self.variances)
-        self.update_gains = self.gains.assign(self.gains*tf.pow(self.var_goal/self.ma_variances, self.gain_rate))
-        self.renorm_phi = self.phi.assign((tf.expand_dims(self.gains,dim=1)*tf.nn.l2_normalize(self.phi, dim=1,epsilon=1e-15)))
-        
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
-        config = tf.ConfigProto(gpu_options=gpu_options)
-        config.gpu_options.allow_growth = True
-        self.sess = tf.Session(config=config)
-        
-        self.sess.run(tf.global_variables_initializer())
-        self.sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1, epsilon=1e-15)))
+        vareta = self.var_avg_rate
+        newvar = (1.-vareta)*self._ma_variances + vareta*self.variances
+        self.update_variance = self._ma_variances.assign(newvar)
+        newgain = self.gains*tf.pow(self.var_goal/self._ma_variances,
+                                    self.gain_rate)
+        self.update_gains = self._gains.assign(newgain)
+        normphi = (tf.expand_dims(self._gains,
+                                  dim=1)*tf.nn.l2_normalize(self.phi, dim=1))
+        self.renorm_phi = self.phi.assign(normphi)
 
     def show_dict(self, cmap='RdBu_r', subset=None, layout=None, savestr=None):
         layout = layout or self.dict_shape
@@ -116,7 +119,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
             display = np.concatenate([display, self.stims.stimarray(Qs[nn*per_comp:(nn+1)*per_comp], layout=layout)],
                                         axis=0)
         plt.figure()
-        arrayplot = plt.imshow(display,interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
+        arrayplot = plt.imshow(display, interpolation='nearest', cmap=cmap, aspect='auto', origin='lower')
         plt.axis('off')
         plt.colorbar()
         if savestr is not None:

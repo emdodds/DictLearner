@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import, division, print_function
+from builtins import (bytes, str, open, super, range,
+                      zip, round, input, int, pow, object)
 
 import numpy as np
 try:
@@ -226,11 +229,12 @@ class Sparsenet(sparsenet.Sparsenet):
         if savestr is not None:
             plt.savefig(savestr, bbox_inches='tight')
 
-    def test_inference(self):
+    def test_inference(self, x=None):
+        x = self.get_batch() if x is None else x
         costs = np.zeros(self.niter)
         with tf.Session(config=self.config, graph=self.graph) as sess:
             self.initialize_vars(sess)
-            sess.run(self.x.assign(self.get_batch()))
+            sess.run(self.x.assign(x))
             sess.run(self.reset_acts)
             for ii in range(self.niter):
                 _, costs[ii] = sess.run([self.inf_op, self.loss])
