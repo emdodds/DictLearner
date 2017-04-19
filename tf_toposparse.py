@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, print_function
-from builtins import (bytes, str, open, super, range,
-                      zip, round, input, int, pow, object)
 
 import tensorflow as tf
-import tf_sparsenet
 import numpy as np
+from tf_sparsenet import Sparsenet as snet
 try:
     import matplotlib.pyplot as plt
 except ImportError:
@@ -34,7 +32,7 @@ def block_diag(*arrs):
         c += cc
     return out
 
-class TopoSparsenet(tf_sparsenet.Sparsenet):
+class TopoSparsenet(snet):
     """Topographic Sparsenet with TensorFlow backend and a few methods for defining topologies."""
 	
     def __init__(self, data, datatype="image", pca=None,
@@ -58,9 +56,9 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
         nunits = self.topo.ncomponents * nunits
         try:
             kwargs['lam']
-            super().__init__(data, nunits=nunits, datatype=datatype, pca=pca, **kwargs)
+            snet.__init__(self, data, nunits=nunits, datatype=datatype, pca=pca, **kwargs)
         except KeyError:
-            super().__init__(data, nunits=nunits, datatype = datatype, pca = pca, lam=0, **kwargs)
+            snet.__init__(self, data, nunits=nunits, datatype = datatype, pca = pca, lam=0, **kwargs)
 
     def build_graph(self):
         graph = tf.get_default_graph()
@@ -106,7 +104,7 @@ class TopoSparsenet(tf_sparsenet.Sparsenet):
 
     def show_dict(self, cmap='RdBu_r', subset=None, layout=None, savestr=None):
         layout = layout or self.dict_shape
-        super().show_dict(cmap, subset, layout, savestr)
+        snet.show_dict(self, cmap, subset, layout, savestr)
 
     def show_dict(self, cmap='RdBu_r', layout=None, savestr=None):
         Qs = self.Q
