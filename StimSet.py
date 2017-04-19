@@ -127,7 +127,7 @@ class ImageSet(StimSet):
     def __init__(self, data, stimshape=(16,16), batch_size=None, buffer=20):
         self.buffer = buffer
         self.datasize = np.prod(stimshape) # size of a patch
-        super().__init__(data, stimshape, batch_size)
+        StimSet.__init__(self, data, stimshape, batch_size)
     
     def rand_stim(self, stimshape=None, batch_size=None):
         """
@@ -160,17 +160,17 @@ class PCvecSet(StimSet):
     def __init__(self, data, stimshape, pca, batch_size=None):
         self.pca = pca
         self.datasize = data.shape[1]
-        super().__init__(data, stimshape, batch_size)
+        StimSet.__init__(self, data, stimshape, batch_size)
         
     def stimarray(self, stims, layout='sqrt'):
         reconst = self.pca.inverse_transform(stims)
-        return super().stimarray(reconst, self.stimshape, layout)
+        return StimSet.stimarray(self, reconst, self.stimshape, layout)
         
     def modspec(self, elem):
-        return super().modspec(self.pca.inverse_transform(elem))
+        return StimSet.modspec(self, self.pca.inverse_transform(elem))
         
     def stim_for_display(self, stim):
-        return super().stim_for_display(self.pca.inverse_transform(stim))
+        return StimSet.stim_for_display(self, self.pca.inverse_transform(stim))
         
 class SpectroPCSet(PCvecSet):
     """A PCvecSet with some extra functionality specifically for spectrograms."""
@@ -183,7 +183,7 @@ class SpectroPCSet(PCvecSet):
         # spectrogram parameters default to those in Carlson, Ming, & DeWeese 2012
         self.tbin_width = tbin_width or 8
         self.freqs = freqs or np.logspace(2,np.log10(16000/4),256)
-        super().__init__(data, stimshape, pca, batch_size)
+        PCvecSet.__init__(self, data, stimshape, pca, batch_size)
     
     def show_stim(self, stim, cmap='RdBu_r', savestr=None, cbar = False):
         reshaped = self.stim_for_display(stim)
@@ -267,4 +267,4 @@ class WaveformPCSet(PCvecSet, WaveformSet):
     """Specifically for PCA reps of waveforms, i.e., 1D time series."""
     
     def tiledplot(self, stims):
-        super().tiledplot(self.pca.inverse_transform(stims))
+        WaveformSet.tiledplot(self, self.pca.inverse_transform(stims))
