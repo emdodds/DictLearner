@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, print_function
-from builtins import (bytes, str, open, super, range,
-                      zip, round, input, int, pow, object)
 """
 Created on Wed Jan 25 13:53:03 2017
 
@@ -199,6 +197,13 @@ class LCALearner(tf_sparsenet.Sparsenet):
         sess.run(self.renorm_phi)
 
         return acts, 0.5*mse_value, mse_value, meanL1_value
+
+    def infer(self, x):
+        feed_dict = {self.x: x}
+        with tf.Session(graph=self.graph, config=self.config) as sess:
+            self.initialize_vars(sess)
+            acts = sess.run([self.full_inference], feed_dict=feed_dict)
+        return acts
 
     def initialize_vars(self, sess):
         sess.run(tf.global_variables_initializer())
