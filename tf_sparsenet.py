@@ -296,7 +296,7 @@ class Sparsenet(sparsenet.Sparsenet):
                 getattr(self, key)
             except AttributeError:
                 print('Unexpected parameter passed: ' + key)
-                setattr(self, key, val)
+            setattr(self, key, val)
 
     def get_histories(self):
         return {'loss': self.loss_history,

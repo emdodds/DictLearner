@@ -244,7 +244,7 @@ class DictLearner(object):
         sorter = np.argsort(means)
         self.sort(means, sorter, plot, savestr)
         return means[sorter]
-        
+   
     def fast_sort(self, L1=False, plot=False, savestr=None):
         """Sorts RFs in order by moving average usage."""
         if L1:
@@ -254,7 +254,7 @@ class DictLearner(object):
         sorter = np.argsort(usages)
         self.sort(usages, sorter, plot, savestr)
         return usages[sorter]
-    
+
     def sort(self, usages, sorter, plot=False, savestr=None):
         self.Q = self.Q[sorter]
         self.L0acts = self.L0acts[sorter]
@@ -262,7 +262,7 @@ class DictLearner(object):
         self.L2acts = self.L2acts[sorter]
         self.meanacts = self.meanacts[sorter]
         self.corrmatrix_ave = self.corrmatrix_ave[sorter]
-        self.corrmatrix_ave= self.corrmatrix_ave.T[sorter].T
+        self.corrmatrix_ave = self.corrmatrix_ave.T[sorter].T
         if plot:
             plt.figure()
             plt.plot(usages[sorter])
@@ -270,8 +270,8 @@ class DictLearner(object):
             plt.xlabel('Dictionary index')
             plt.ylabel('Fraction of stimuli')
             if savestr is not None:
-                plt.savefig(savestr,format='png', bbox_inches='tight')
-                
+                plt.savefig(savestr, format='png', bbox_inches='tight')
+
     def load(self, filename=None):
         if filename is None:
             filename = self.paramfile
@@ -280,13 +280,18 @@ class DictLearner(object):
             self.Q, params, histories = pickle.load(f)
         self.set_histories(histories)
         self.set_params(params)
-        
+
     def set_params(self, params):
-        raise NotImplementedError
-        
+        for key, val in params.items():
+            try:
+                getattr(self, key)
+            except AttributeError:
+                print('Unexpected parameter passed: ' + key)
+            setattr(self, key, val)
+
     def get_param_list(self):
         raise NotImplementedError
-        
+
     def save(self, filename=None):
         filename = filename or self.paramfile
         if filename is None:
@@ -298,12 +303,38 @@ class DictLearner(object):
             pickle.dump([self.Q, params, histories], f)
 
     def get_histories(self):
+        return {'errorhist': self.errorhist,
+                'L0hist': self.L0hist,
+                'L1hist': self.L1hist,
+                'L2hist': self.L2hist,
+                'corrmatrix_ave': self.corrmatrix_ave,
+                'L1': self.L1hist,
+                'L0acts': self.L0acts,
+                'L1acts': self.L1acts,
+                'L2acts': self.L2acts,
+                'meanacts': self.meanacts}
+
+    def set_histories(self, histories):
+        if not isinstance(histories, dict):
+            self._old_set_histories(histories)
+            return
+        self.errorhist = histories['errorhist']
+        self.L0hist = histories['L0hist']
+        self.L1hist = histories['L1hist']
+        self.L2hist = histories['L2hist']
+        self.corrmatrix_ave = histories['corrmatrix_ave']
+        self.L1hist = histories['L1']
+        self.L0acts = histories['L0acts']
+        self.L1acts = histories['L1acts']
+        self.L2acts = histories['L2acts']
+        self.meanacts = histories['meanacts']
+
+    def _old_get_histories(self):
         return (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
                      self.L1acts, self.L1hist, self.L2hist, self.L2acts,
                      self.corrmatrix_ave)
 
-    def set_histories(self, histories):
+    def _old_set_histories(self, histories):
         (self.errorhist, self.meanacts, self.L0acts, self.L0hist,
                      self.L1acts, self.L1hist, self.L2hist, self.L2acts,
                      self.corrmatrix_ave) = histories
-               
