@@ -127,6 +127,11 @@ class TopoSparsenet(snet):
     def sort(self, *args, **kwargs):
         print("The topographic order is meaningful, don't sort it away!") 
 
+    def get_param_list(self):
+        params = snet.get_param_list(self)
+        params['lam_g'] = self.lam_g
+        return params
+
 
 class topology():
     def __init__(self, shape, discs=True, torus=True, binary=True, sigma = 1.0, ncomponents = 1):

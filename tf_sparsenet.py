@@ -68,8 +68,8 @@ class Sparsenet(sparsenet.Sparsenet):
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
         self.Q = tf.random_normal([self.nunits, self.stims.datasize])
-        self.ma_variances = tf.ones(self.nunits)
-        self.gains = tf.ones(self.nunits)
+        self.ma_variances = np.ones(self.nunits, dtype='float32')
+        self.gains = np.ones(self.nunits, dtype='float32')
         self.graph = self.build_graph()
         self.initialize_stats()
 
