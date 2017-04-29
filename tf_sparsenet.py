@@ -88,7 +88,7 @@ class Sparsenet(sparsenet.Sparsenet):
         with tf.Session(graph=self.graph, config=self.config) as sess:
             sess.run(tf.global_variables_initializer())
             self._saver.save(sess, self.paramfile+'.ckpt')
-            self.initialize_vars()
+            self.initialize_vars(sess)
             self._saver.save(sess, self.paramfile+'.ckpt')
 
     def initialize_stats(self):
