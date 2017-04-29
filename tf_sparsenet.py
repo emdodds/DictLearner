@@ -71,6 +71,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.ma_variances = np.ones(self.nunits, dtype='float32')
         self.gains = np.ones(self.nunits, dtype='float32')
         self.graph = self.build_graph()
+        self._saver = tf.train.Saver()
         self.initialize_stats()
 
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
@@ -80,6 +81,7 @@ class Sparsenet(sparsenet.Sparsenet):
             sess.run(tf.global_variables_initializer())
             self.Q = sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi,
                                                                  dim=1)))
+            self._saver.save(sess, self.paramfile+'.ckpt')
 
     def initialize_stats(self):
         self.loss_history = np.array([])
@@ -164,7 +166,7 @@ class Sparsenet(sparsenet.Sparsenet):
 
     def initialize_vars(self, sess):
         """Initializes values of tf Variables."""
-        sess.run(tf.global_variables_initializer())
+        self._saver.restore(sess, self.paramfile+'.ckpt')
         sess.run([self.phi.assign(self.Q),
                   self._infrate.assign(self.infrate),
                   self._learnrate.assign(self.learnrate),
@@ -193,6 +195,7 @@ class Sparsenet(sparsenet.Sparsenet):
                         try:
                             print("Saving progress to " + self.paramfile)
                             self.save()
+                            self._saver.save(sess, self.paramfile+'.ckpt')
                         except (ValueError, TypeError) as er:
                             print('Failed to save parameters. ', er)
             self.retrieve_vars(sess)

@@ -9,6 +9,7 @@ try:
 except ImportError:
     print("Can't import matplotlib. No plotting.")
 
+
 def block_diag(*arrs):
     """
     copied from scipy.linalg.block_diag to avoid scipy dependency because long story
@@ -32,24 +33,26 @@ def block_diag(*arrs):
         c += cc
     return out
 
+
 class TopoSparsenet(snet):
-    """Topographic Sparsenet with TensorFlow backend and a few methods for defining topologies."""
-	
+    """Topographic Sparsenet with TensorFlow backend
+     and a few methods for defining topologies."""
+
     def __init__(self, data, datatype="image", pca=None,
-      dict_shape = (30,30), topo = None, lam_g=0.1,
-      **kwargs):
+                 dict_shape=(30, 30), topo=None, lam_g=0.1,
+                 **kwargs):
         """
         Topographic Sparsenet inherits from Sparsenet. Its unique
-        attributes give the dictionary a shape and define the relative 
+        attributes give the dictionary a shape and define the relative
         weight of the topographic term in the cost function.
         The topology matrix g is defined by the topology object topo.
-        
+
         Args:
         lam_g : float, defines weight of topography term
         dict_shape : tuple (len, wid) of ints specifying shape of dictionary
         """
         self.lam_g = lam_g
-        self.epsilon = 0.0001 # to regularize derivative of square root
+        self.epsilon = 0.0001  # to regularize derivative of square root
         self.dict_shape = dict_shape
         nunits = int(np.prod(self.dict_shape))
         self.topo = topo or topology((nunits, nunits))
@@ -58,37 +61,37 @@ class TopoSparsenet(snet):
             kwargs['lam']
             snet.__init__(self, data, nunits=nunits, datatype=datatype, pca=pca, **kwargs)
         except KeyError:
-            snet.__init__(self, data, nunits=nunits, datatype = datatype, pca = pca, lam=0, **kwargs)
+            snet.__init__(self, data, nunits=nunits, datatype=datatype, pca=pca, lam=0, **kwargs)
 
     def build_graph(self):
         graph = tf.get_default_graph()
 
         self.g = tf.constant(self.topo.get_matrix(), dtype=tf.float32)
-        
+
         self._infrate = tf.Variable(self.infrate, trainable=False)
         self._learnrate = tf.Variable(self.learnrate, trainable=False)
-        
+
         self.phi = tf.Variable(self.Q)
-        self.acts = tf.Variable(tf.zeros([self.nunits,self.batch_size]))
-        self.reset_acts = self.acts.assign(tf.zeros([self.nunits,self.batch_size]))
-        
+        self.acts = tf.Variable(tf.zeros([self.nunits, self.batch_size]))
+        self.reset_acts = self.acts.assign(tf.zeros([self.nunits, self.batch_size]))
+
         self.x = tf.Variable(tf.zeros([self.batch_size, self.stims.datasize]), trainable=False)
         self.xhat = tf.matmul(tf.transpose(self.acts), self.phi, name='xhat')
         self.resid = self.x - self.xhat
         self.mse = tf.reduce_sum(tf.square(self.resid))/self.batch_size/self.stims.datasize
         self.meanL1 = tf.reduce_sum(tf.abs(self.acts))/self.batch_size
-        self.layer2 = tf.reduce_sum(tf.sqrt(tf.matmul(self.g,tf.square(self.acts),
+        self.layer2 = tf.reduce_sum(tf.sqrt(tf.matmul(self.g, tf.square(self.acts),
             name='g_times_acts') + self.epsilon))/self.batch_size
         self.loss = 0.5*self.mse + (self.lam*self.meanL1 + self.lam_g*self.layer2)/self.stims.datasize
-        
+
         inffactor = self.batch_size*self.stims.datasize
         inferer = tf.train.GradientDescentOptimizer(self._infrate*inffactor)
         self.inf_op = inferer.minimize(self.loss, var_list=[self.acts])
-        
+
         learner = tf.train.GradientDescentOptimizer(self.learnrate)
         learn_step = tf.Variable(0,name='learn_step', trainable=False)
         self.learn_op = learner.minimize(self.loss, global_step=learn_step, var_list=[self.phi])
-        
+
         self._ma_variances = tf.Variable(self.ma_variances, trainable=False)
         self._gains = tf.Variable(self.gains, trainable=False)
         _, self.variances = tf.nn.moments(self.acts, axes=[1])
@@ -102,16 +105,14 @@ class TopoSparsenet(snet):
                                   dim=1)*tf.nn.l2_normalize(self.phi, dim=1))
         self.renorm_phi = self.phi.assign(normphi)
 
-    def show_dict(self, cmap='RdBu_r', subset=None, layout=None, savestr=None):
-        layout = layout or self.dict_shape
-        snet.show_dict(self, cmap, subset, layout, savestr)
+        return graph
 
     def show_dict(self, cmap='RdBu_r', layout=None, savestr=None):
         Qs = self.Q
         layout = layout or self.dict_shape
         ncomp = self.topo.ncomponents
         per_comp = np.prod(layout)
-        nn=0
+        nn = 0
         display = self.stims.stimarray(Qs[nn*per_comp:(nn+1)*per_comp], layout=layout)
         for nn in range(1,ncomp):
             display = np.concatenate([display, self.stims.stimarray(Qs[nn*per_comp:(nn+1)*per_comp], layout=layout)],
@@ -125,7 +126,7 @@ class TopoSparsenet(snet):
         return display
 
     def sort(self, *args, **kwargs):
-        print("The topographic order is meaningful, don't sort it away!") 
+        print("The topographic order is meaningful, don't sort it away!")
 
     def get_param_list(self):
         params = snet.get_param_list(self)

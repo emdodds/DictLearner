@@ -75,6 +75,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self._load_stims(data, datatype, self.stimshape, pca)
         self.Q = tf.random_normal([self.nunits, self.stims.datasize])
         self.graph = self.build_graph()
+        self._saver = tf.train.Saver()
         self.initialize_stats()
 
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
@@ -83,6 +84,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         with tf.Session(graph=self.graph, config=self.config) as sess:
             sess.run(tf.global_variables_initializer())
             self.Q = sess.run(self.renorm_phi)
+            self._saver.save(sess, self.paramfile+'.ckpt')
 
     def acts(self, uu, ll):
         """Computes the activation function given the internal varaiable uu
@@ -206,7 +208,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         return acts
 
     def initialize_vars(self, sess):
-        sess.run(tf.global_variables_initializer())
+        self._saver.restore(sess, self.paramfile+'.ckpt')
         sess.run([self.phi.assign(self.Q),
                   self.thresh.assign(self.lam),
                   self._infrate.assign(self.infrate),
