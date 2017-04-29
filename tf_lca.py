@@ -24,7 +24,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
                  pca=None,
                  nunits=200,
                  batch_size=100,
-                 paramfile=None,
+                 paramfile='dummy',
                  moving_avg_rate=0.01,
                  stimshape=None,
                  lam=0.15,

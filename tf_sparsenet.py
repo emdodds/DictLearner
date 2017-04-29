@@ -22,7 +22,7 @@ class Sparsenet(sparsenet.Sparsenet):
                  pca=None,
                  nunits=200,
                  batch_size=100,
-                 paramfile=None,
+                 paramfile='dummy',
                  moving_avg_rate=0.01,
                  stimshape=None,
                  lam=0.15,
@@ -81,6 +81,14 @@ class Sparsenet(sparsenet.Sparsenet):
             sess.run(tf.global_variables_initializer())
             self.Q = sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi,
                                                                  dim=1)))
+            self._saver.save(sess, self.paramfile+'.ckpt')
+
+    def load(self, filename):
+        sparsenet.Sparsenet.load(self, filename)
+        with tf.Session(graph=self.graph, config=self.config) as sess:
+            sess.run(tf.global_variables_initializer())
+            self._saver.save(sess, self.paramfile+'.ckpt')
+            self.initialize_vars()
             self._saver.save(sess, self.paramfile+'.ckpt')
 
     def initialize_stats(self):
