@@ -71,25 +71,15 @@ class Sparsenet(sparsenet.Sparsenet):
         self.ma_variances = np.ones(self.nunits, dtype='float32')
         self.gains = np.ones(self.nunits, dtype='float32')
         self.graph = self.build_graph()
-        self._saver = tf.train.Saver()
         self.initialize_stats()
 
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         self.config = tf.ConfigProto(gpu_options=gpu_options)
         self.config.gpu_options.allow_growth = True
         with tf.Session(graph=self.graph, config=self.config) as sess:
-            sess.run(tf.global_variables_initializer())
+            sess.run(self._init_op)
             self.Q = sess.run(self.phi.assign(tf.nn.l2_normalize(self.phi,
                                                                  dim=1)))
-            self._saver.save(sess, self.paramfile+'.ckpt')
-
-    def load(self, filename):
-        sparsenet.Sparsenet.load(self, filename)
-        with tf.Session(graph=self.graph, config=self.config) as sess:
-            sess.run(tf.global_variables_initializer())
-            self._saver.save(sess, self.paramfile+'.ckpt')
-            self.initialize_vars(sess)
-            self._saver.save(sess, self.paramfile+'.ckpt')
 
     def initialize_stats(self):
         self.loss_history = np.array([])
@@ -156,6 +146,8 @@ class Sparsenet(sparsenet.Sparsenet):
                                   dim=1)*tf.nn.l2_normalize(self.phi, dim=1))
         self.renorm_phi = self.phi.assign(normphi)
 
+        self._init_op = tf.global_variables_initializer()
+
         return graph
 
     def train_step(self, sess):
@@ -174,7 +166,7 @@ class Sparsenet(sparsenet.Sparsenet):
 
     def initialize_vars(self, sess):
         """Initializes values of tf Variables."""
-        self._saver.restore(sess, self.paramfile+'.ckpt')
+        sess.run(self._init_op)
         sess.run([self.phi.assign(self.Q),
                   self._infrate.assign(self.infrate),
                   self._learnrate.assign(self.learnrate),
@@ -203,7 +195,6 @@ class Sparsenet(sparsenet.Sparsenet):
                         try:
                             print("Saving progress to " + self.paramfile)
                             self.save()
-                            self._saver.save(sess, self.paramfile+'.ckpt')
                         except (ValueError, TypeError) as er:
                             print('Failed to save parameters. ', er)
             self.retrieve_vars(sess)

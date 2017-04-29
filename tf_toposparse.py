@@ -105,6 +105,8 @@ class TopoSparsenet(snet):
                                   dim=1)*tf.nn.l2_normalize(self.phi, dim=1))
         self.renorm_phi = self.phi.assign(normphi)
 
+        self._init_op = tf.global_variables_initializer()
+
         return graph
 
     def show_dict(self, cmap='RdBu_r', layout=None, savestr=None):

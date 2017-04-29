@@ -75,16 +75,14 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self._load_stims(data, datatype, self.stimshape, pca)
         self.Q = tf.random_normal([self.nunits, self.stims.datasize])
         self.graph = self.build_graph()
-        self._saver = tf.train.Saver()
         self.initialize_stats()
 
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.2)
         self.config = tf.ConfigProto(gpu_options=gpu_options)
         self.config.gpu_options.allow_growth = True
         with tf.Session(graph=self.graph, config=self.config) as sess:
-            sess.run(tf.global_variables_initializer())
+            sess.run(self._init_op)
             self.Q = sess.run(self.renorm_phi)
-            self._saver.save(sess, self.paramfile+'.ckpt')
 
     def acts(self, uu, ll):
         """Computes the activation function given the internal varaiable uu
@@ -178,6 +176,8 @@ class LCALearner(tf_sparsenet.Sparsenet):
                                                       self.seek_snr_rate))
         self.snr_db = 10.0*tf.log(self.snr)/np.log(10.0)
 
+        self._init_op = tf.global_variables_initializer()
+
         return graph
 
     def train_step(self, sess):
@@ -201,14 +201,21 @@ class LCALearner(tf_sparsenet.Sparsenet):
         return acts, 0.5*mse_value, mse_value, meanL1_value
 
     def infer(self, x):
-        feed_dict = {self.x: x}
+        """Reteurn activities for given data.
+        x.shape[0] should be a multiple of batch_size."""
         with tf.Session(graph=self.graph, config=self.config) as sess:
             self.initialize_vars(sess)
-            acts = sess.run([self.full_inference], feed_dict=feed_dict)
+            nexamples = x.shape[0]
+            nbatches = int(nexamples/self.batch_size)
+            acts = np.zeros((self.nunits, 0))
+            for ii in range(nbatches):
+                feed_dict = {self.x: x}
+                newacts = sess.run([self.full_inference], feed_dict=feed_dict)
+                acts = np.concatenate([acts]+newacts, axis=1)
         return acts
 
     def initialize_vars(self, sess):
-        self._saver.restore(sess, self.paramfile+'.ckpt')
+        sess.run(self._init_op)
         sess.run([self.phi.assign(self.Q),
                   self.thresh.assign(self.lam),
                   self._infrate.assign(self.infrate),
