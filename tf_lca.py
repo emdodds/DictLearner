@@ -209,7 +209,8 @@ class LCALearner(tf_sparsenet.Sparsenet):
             nbatches = int(nexamples/self.batch_size)
             acts = np.zeros((self.nunits, 0))
             for ii in range(nbatches):
-                feed_dict = {self.x: x}
+                newx = x[ii*self.batch_size:(ii+1)*self.batch_size]
+                feed_dict = {self.x: newx}
                 newacts = sess.run([self.full_inference], feed_dict=feed_dict)
                 acts = np.concatenate([acts]+newacts, axis=1)
         return acts
