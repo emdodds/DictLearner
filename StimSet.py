@@ -33,8 +33,8 @@ class StimSet(object):
             vec = self.data[which,...]
             if len(vec.shape) > 1:
                 vec = vec.reshape(self.stimsize)
-            X[:,i] = vec
-        return X  
+            X[:, i] = vec
+        return X
     
     @staticmethod
     def _stimarray(stims, stimshape, layout='sqrt'):
@@ -67,7 +67,7 @@ class StimSet(object):
     def _get_layout(nstim, length=None, height=None, layout='square'):
         """Get a number of rows n and columns m corresponding to a given
         layout type. Returns the argument if it's already a pair."""
-        if layout=='square':
+        if layout == 'square':
             if np.floor(np.sqrt(nstim))**2 != nstim:
                 n = int(np.ceil(np.sqrt(nstim/2.)))
                 m = int(np.ceil(nstim/n))
@@ -75,28 +75,28 @@ class StimSet(object):
                 # M is a perfect square
                 m = int(np.sqrt(nstim))
                 n = m
-        elif layout=='sqrt':
+        elif layout == 'sqrt':
             # if length != height, partly account for this so stimuli aren't so distorted. 
             # could remove the extra square root to fully accommodate
             n = int(np.sqrt(nstim*np.sqrt(height/length)))
             m = int(np.ceil(nstim/n))
         else:
-            n,m = layout
-        return n,m
+            n, m = layout
+        return n, m
 
     def stimarray(self, stims, stimshape=None, layout='sqrt'):
         stimshape = stimshape or self.stimshape
         return StimSet._stimarray(stims, stimshape, layout)
-        
+
     def modspec(self, elem):
         """Compute the modulation power spectrum."""
         image = elem.reshape(self.stimshape)
-        fourier =  np.fft.rfft2(image)
+        fourier = np.fft.rfft2(image)
         mid = int(fourier.shape[0]/2)
         power = np.abs(fourier)**2
         avgmag = np.array([(power[ii] + power[-ii])/2 for ii in range(mid)])
         return avgmag
-        
+
     def stim_for_display(self, stim):
         return stim.reshape(self.stimshape)
 
@@ -107,19 +107,19 @@ class StimSet(object):
         gs = gridspec.GridSpec(m, n, wspace=0.0, hspace=0.0)
         for ii in range(m):
             for jj in range(n):
-                ax = plt.subplot(gs[ii,jj])
+                ax = plt.subplot(gs[ii, jj])
                 index = ii*n + jj
                 if index < nstim:
                     image = self.stim_for_display(stims[index])
                     image /= np.max(np.abs(image))
-                    ax.imshow(image.T, 
-                               cmap=cmap, origin='lower', aspect=aspect,interpolation='nearest',
-                               clim=(-1.0,1.0))
-                    ax.get_xaxis().set_visible(False)
-                    ax.get_yaxis().set_visible(False)
+                    ax.imshow(image.T,
+                              cmap=cmap, origin='lower', aspect=aspect, interpolation='nearest',
+                              clim=(-1.0, 1.0))
+                ax.get_xaxis().set_visible(False)
+                ax.get_yaxis().set_visible(False)
         if savestr is not None:
             plt.savefig(savestr, bbox_inches='tight')
-        
+
 class ImageSet(StimSet):
     """Container for image data. The 'stimuli' are patches drawn randomly from
     the set of images."""
