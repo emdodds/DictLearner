@@ -36,7 +36,8 @@ ncomponents = args.ncomponents
 
 g_shape = np.prod(shape)
 g_shape = (g_shape, g_shape)
-topo = tf_toposparse.topology(g_shape, discs = discs, torus = torus, binary = binarize, sigma=sigma, ncomponents = ncomponents)
+topo = tf_toposparse.topology(g_shape, discs=discs, torus=torus,
+                              binary=binarize, sigma=sigma, ncomponents=ncomponents)
 
 if data == 'images':
      # not updated recently!!!

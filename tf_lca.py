@@ -201,7 +201,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         return acts, 0.5*mse_value, mse_value, meanL1_value
 
     def infer(self, x):
-        """Reteurn activities for given data.
+        """Return activities for given data.
         x.shape[0] should be a multiple of batch_size."""
         with tf.Session(graph=self.graph, config=self.config) as sess:
             self.initialize_vars(sess)
