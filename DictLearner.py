@@ -13,7 +13,7 @@ import pickle
 try:
     import matplotlib.pyplot as plt
     from scipy import ndimage
-    from scipy import skew
+    from scipy.stats import skew
 except ImportError:
     print('Plotting and modulation plot unavailable.')
 import StimSet
