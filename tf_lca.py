@@ -98,9 +98,9 @@ class LCALearner(tf_sparsenet.Sparsenet):
         else:
             rect = tf.abs
 
-        return tf.select(tf.greater(rect(uu), ll),
-                         thresholded(uu), tf.multiply(0.0, uu),
-                         name='activity')
+        return tf.where(tf.greater(rect(uu), ll),
+                        thresholded(uu), tf.multiply(0.0, uu),
+                        name='activity')
 
     def build_graph(self):
         graph = tf.get_default_graph()
@@ -128,9 +128,9 @@ class LCALearner(tf_sparsenet.Sparsenet):
             lca_compet = tf.matmul(self.lca_gram, self.acts(old_u, ll))
             du = self.lca_drive - lca_compet - old_u
             new_l = tf.constant(0.98)*ll  # 0.98 lifted from Bruno's code
-            new_l = tf.select(tf.greater(new_l, self.thresh),
-                              new_l,
-                              self.thresh*np.ones(self.batch_size))
+            new_l = tf.where(tf.greater(new_l, self.thresh),
+                             new_l,
+                             self.thresh*np.ones(self.batch_size))
             return (old_u + self.infrate*du, new_l)
 
         self._itercount = tf.constant(np.arange(self.niter))
@@ -283,9 +283,9 @@ class LCALearnerTI(LCALearner):
             lca_compet = tf.matmul(self.lca_gram, self.acts(old_u, ll))
             du = self.lca_drive - lca_compet - old_u
             new_l = tf.constant(0.98)*ll  # 0.98 lifted from Bruno's code
-            new_l = tf.select(tf.greater(new_l, self.thresh),
-                              new_l,
-                              self.thresh*np.ones(self.batch_size))
+            new_l = tf.where(tf.greater(new_l, self.thresh),
+                             new_l,
+                             self.thresh*np.ones(self.batch_size))
             return (old_u + self.infrate*du, new_l)
 
         self._itercount = tf.constant(np.arange(self.niter))
