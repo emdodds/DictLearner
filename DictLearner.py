@@ -220,8 +220,8 @@ class DictLearner(object):
                    aspect='auto', savestr=None):
         """Nicer dictionary visualization.
         Creates a matplotlib axis for each element, so very slow."""
-        return self.stims.tiledplot(self.Q, cmap=cmap, layout=layout,
-                                    aspect=aspect, savestr=savestr)
+        self.stims.tiledplot(self.Q, cmap=cmap, layout=layout,
+                             aspect=aspect, savestr=savestr)
 
     def show_element(self, index, cmap='jet', labels=None, savestr=None):
         elem = self.stims.stim_for_display(self.Q[index])

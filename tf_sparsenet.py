@@ -257,7 +257,6 @@ class Sparsenet(sparsenet.Sparsenet):
         plt.plot(smoothederror, 'b', smoothedactivity, 'g')
 
     def adjust_rates(self, factor):
-        self.infrate = factor*self.infrate
         self.learnrate = factor*self.learnrate
 
     def sort_dict(self, **kwargs):
