@@ -187,16 +187,18 @@ class LCALearner(tf_sparsenet.Sparsenet):
         acts = sess.run(self.full_inference, feed_dict=feed_dict)
 
         # get losses and update weights
+        # update lambda to seek reconstruction snr if specified
         op_list = [self.mse, self.meanL1, self.learn_op]
-        mse_value, meanL1_value, _ = sess.run(op_list,
-                                              feed_dict=feed_dict)
+        if self.snr_goal is not None:
+            op_list += [self.seek_snr]
+            mse_value, meanL1_value, _, _ = sess.run(op_list,
+                                                     feed_dict=feed_dict)
+        else:
+            mse_value, meanL1_value, _ = sess.run(op_list,
+                                                  feed_dict=feed_dict)
 
         # normalize the weights
         sess.run(self.renorm_phi)
-
-        # update lambda to seek reconstruction snr if specified
-        if self.snr_goal is not None:
-            sess.run(self.seek_snr, feed_dict=feed_dict)
 
         return acts, 0.5*mse_value, mse_value, meanL1_value
 
