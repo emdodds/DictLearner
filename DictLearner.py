@@ -52,7 +52,9 @@ class DictLearner(object):
         self.meanacts = np.zeros_like(self.L0acts)
 
     def _load_stims(self, data, datatype, stimshape, pca):
-        if datatype == "image" and pca is not None:
+        if isinstance(data, StimSet.StimSet):
+            self.stims = data
+        elif datatype == "image" and pca is not None:
             stimshape = stimshape or (16, 16)
             self.stims = StimSet.PCvecSet(data, stimshape, pca,
                                           self.batch_size)
