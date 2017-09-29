@@ -284,11 +284,11 @@ class WaveformPCSet(PCvecSet, WaveformSet):
 
 
 class ToySparseSet(StimSet):
-    """Gaussian sources linearly mixed by laplacian coefficients."""
-    # TODO: test
+    """Gaussian sources linearly mixed by laplacian coefficients,
+    optiohally with isotropic gaussian noise added."""
     def __init__(self, dim=200, nsource=200, scale=1,
                  nonneg=False, nstims=300000, rng=None,
-                 batch_size=100, white=False):
+                 batch_size=100, white=False, noise=0):
         self.stimshape = [dim]
         self.stimsize = dim
         self.nstims = nstims
@@ -309,7 +309,16 @@ class ToySparseSet(StimSet):
         if self.nonneg:
             coefficients = np.abs(coefficients)
         self.data = coefficients @ self.sources
+
+        if noise > 0:
+            self.data += rng.normal(scale=noise, size=self.data.shape)
+
         self.data -= self.data.mean(0, keepdims=True)
+
+        self.white = white
+        if white:
+            self.whiten()
+
         self.data /= self.data.std(0, keepdims=True)
 
     def test_fit(self, model):
@@ -321,3 +330,20 @@ class ToySparseSet(StimSet):
         # how close is the closest model source to each true source?
         bestfits = np.max(np.abs(allthedots), axis=1)
         return np.median(bestfits)
+
+    def whiten(self, blocks=20000, eps=0.0001):
+        """Assumes self.data already created, mean 0."""
+        cov = np.zeros([self.datasize, self.datasize])
+        nblocks = int(np.ceil(self.nstims / blocks))
+        for ind in range(nblocks):
+            X = self.data[blocks*ind:blocks*(ind+1)]
+            cov += X.T.dot(X)
+        eigvals, eigvecs = np.linalg.eigh(cov)
+
+        idx = np.argsort(eigvals)
+        svals = np.sqrt(eigvals[idx][::-1])
+        eigvecs = eigvecs[idx][::-1]
+
+        self.data = self.data.dot(eigvecs.T)
+        self.data = self.data.dot(np.diag(1./np.maximum(svals, eps)))
+        self.data = self.data.dot(eigvecs)
