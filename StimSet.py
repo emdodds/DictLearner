@@ -339,6 +339,9 @@ class ToySparseSet(StimSet):
             X = self.data[blocks*ind:blocks*(ind+1)]
             cov += X.T.dot(X)
         eigvals, eigvecs = np.linalg.eigh(cov)
+        if np.any(np.isnan(eigvals)):
+            print('Warning: some nan eigenvalues found, replacing with small numbers.')
+            eigvals[np.isnan(eigvals)] = 0.9 * eps**2
 
         idx = np.argsort(eigvals)
         svals = np.sqrt(eigvals[idx][::-1])
