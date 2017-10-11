@@ -342,11 +342,15 @@ class ToySparseSet(StimSet):
         if np.any(np.isnan(eigvals)):
             print('Warning: some nan eigenvalues found, replacing with small numbers.')
             eigvals[np.isnan(eigvals)] = 0.9 * eps**2
+        if np.any(eigvals < 0):
+            print('Warning: some negative eigenvalues of covariance matrix found. Replacing with small numbers.')
+            eigvals[eigvals<0] = 0.9 * eps**2
 
         idx = np.argsort(eigvals)
         svals = np.sqrt(eigvals[idx][::-1])
         eigvecs = eigvecs[idx][::-1]
 
+        # do ZCA whitening
         self.data = self.data.dot(eigvecs.T)
         self.data = self.data.dot(np.diag(1./np.maximum(svals, eps)))
         self.data = self.data.dot(eigvecs)
