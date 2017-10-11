@@ -326,7 +326,12 @@ class ToySparseSet(StimSet):
         true sources. The metric is the median of the normalized dot products
         between each true source and the closest model source."""
         fit = model/np.linalg.norm(model, axis=1, keepdims=True)
-        allthedots = self.sources.dot(fit.T)
+        if self.white:
+            sources = self.sources.dot(self.zca_matrix)
+            sources /= np.linalg.norm(sources, axis=1, keepdims=True)
+        else:
+            sources = self.sources
+        allthedots = sources.dot(fit.T)
         # how close is the closest model source to each true source?
         bestfits = np.max(np.abs(allthedots), axis=1)
         return np.median(bestfits)
@@ -344,13 +349,13 @@ class ToySparseSet(StimSet):
             eigvals[np.isnan(eigvals)] = 0.9 * eps**2
         if np.any(eigvals < 0):
             print('Warning: some negative eigenvalues of covariance matrix found. Replacing with small numbers.')
-            eigvals[eigvals<0] = 0.9 * eps**2
+            eigvals[eigvals < 0] = 0.9 * eps**2
 
         idx = np.argsort(eigvals)
         svals = np.sqrt(eigvals[idx][::-1])
         eigvecs = eigvecs[idx][::-1]
 
         # do ZCA whitening
-        self.data = self.data.dot(eigvecs.T)
-        self.data = self.data.dot(np.diag(1./np.maximum(svals, eps)))
-        self.data = self.data.dot(eigvecs)
+        wm = np.diag(1./np.maximum(svals, eps))
+        self.zca_matrix = eigvecs.T.dot(wm).dot(eigvecs)
+        self.data = self.data.dot(self.zca_matrix)
