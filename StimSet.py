@@ -301,7 +301,7 @@ class ToySparseSet(StimSet):
 
         # generate data
         if nsource is None:
-            nsource = self.dim
+            nsource = dim
         self.sources = rng.normal(size=(nsource, dim))
         self.sources /= np.linalg.norm(self.sources, axis=1, keepdims=True)
 
