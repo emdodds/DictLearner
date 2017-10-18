@@ -286,7 +286,7 @@ class WaveformPCSet(PCvecSet, WaveformSet):
 class ToySparseSet(StimSet):
     """Gaussian sources linearly mixed by laplacian coefficients,
     optiohally with isotropic gaussian noise added."""
-    def __init__(self, dim=200, nsource=200, scale=1,
+    def __init__(self, dim=200, nsource=None, scale=1,
                  nonneg=False, nstims=300000, rng=None,
                  batch_size=100, white=False, noise=0):
         self.stimshape = [dim]
@@ -300,6 +300,8 @@ class ToySparseSet(StimSet):
         self.rng = rng
 
         # generate data
+        if nsource is None:
+            nsource = self.dim
         self.sources = rng.normal(size=(nsource, dim))
         self.sources /= np.linalg.norm(self.sources, axis=1, keepdims=True)
 
