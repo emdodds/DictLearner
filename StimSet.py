@@ -288,7 +288,8 @@ class ToySparseSet(StimSet):
     optiohally with isotropic gaussian noise added."""
     def __init__(self, dim=200, nsource=None, scale=1,
                  nonneg=False, nstims=300000, rng=None,
-                 batch_size=100, white=False, noise=0):
+                 batch_size=100, white=False, noise=0,
+                 mean_center=True):
         self.stimshape = [dim]
         self.stimsize = dim
         self.nstims = nstims
@@ -315,7 +316,8 @@ class ToySparseSet(StimSet):
         if noise > 0:
             self.data += rng.normal(scale=noise, size=self.data.shape)
 
-        self.data -= self.data.mean(0, keepdims=True)
+        if mean_center:
+            self.data -= self.data.mean(0, keepdims=True)
 
         self.white = white
         if white:
