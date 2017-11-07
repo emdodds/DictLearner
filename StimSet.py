@@ -311,7 +311,7 @@ class ToySparseSet(StimSet):
         self.nonneg = nonneg
         if self.nonneg:
             coefficients = np.abs(coefficients)
-        self.data = coefficients @ self.sources
+        self.data = coefficients.dot(self.sources)
 
         if noise > 0:
             self.data += rng.normal(scale=noise, size=self.data.shape)
