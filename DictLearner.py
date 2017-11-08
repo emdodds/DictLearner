@@ -189,6 +189,7 @@ class DictLearner(object):
 
     def compute_corrmatrix(self, acts, thiserror, means,
                            center_corr=True, batch_size=None):
+        batch_size = batch_size or self.batch_size
         if center_corr:
             actdevs = acts-means[:, np.newaxis]
             corrmatrix = (actdevs).dot(actdevs.T)/batch_size
