@@ -25,7 +25,8 @@ class DictLearner(object):
     and learning."""
     def __init__(self, data, learnrate, nunits,
                  paramfile=None, theta=0, moving_avg_rate=0.001,
-                 stimshape=None, datatype="image", batch_size=100, pca=None):
+                 stimshape=None, datatype="image", batch_size=100, pca=None,
+                 store_every=1):
 
         self.nunits = nunits
         self.batch_size = batch_size
@@ -34,6 +35,7 @@ class DictLearner(object):
         self.theta = theta
         self.moving_avg_rate = moving_avg_rate
         self.initialize_stats()
+        self.store_every = store_every
 
         self._load_stims(data, datatype, stimshape, pca)
 
@@ -151,10 +153,10 @@ class DictLearner(object):
             acts, _, _ = self.infer(X)
             thiserror = self.learn(X, acts, normalize)
 
-            if trial % 50 == 0:
-                print(trial)
-
-            self.store_statistics(acts, thiserror, batch_size)
+            if trial % self.store_every == 0:
+                if trial % 50 == 0 or self.store_every > 50:
+                    print(trial)
+                self.store_statistics(acts, thiserror, batch_size)
 
             if (trial % 1000 == 0 or trial+1 == ntrials) and trial != 0:
                 try:
@@ -182,6 +184,11 @@ class DictLearner(object):
         self.L0hist = np.append(self.L0hist, np.mean(acts != 0))
         self.L1hist = np.append(self.L1hist, np.mean(np.abs(acts)))
         self.L2hist = np.append(self.L2hist, np.mean(acts**2))
+        return self.compute_corrmatrix(acts, thiserror,
+                                       means, center_corr, batch_size)
+
+    def compute_corrmatrix(self, acts, thiserror, means,
+                           center_corr=True, batch_size=None):
         if center_corr:
             actdevs = acts-means[:, np.newaxis]
             corrmatrix = (actdevs).dot(actdevs.T)/batch_size

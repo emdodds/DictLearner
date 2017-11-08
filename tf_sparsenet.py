@@ -31,7 +31,8 @@ class Sparsenet(sparsenet.Sparsenet):
                  var_avg_rate=0.1,
                  gain_rate=0.01,
                  infrate=0.1,
-                 learnrate=2.0):
+                 learnrate=2.0,
+                 store_every=1):
         """
         Parameters
         data        : [nsamples, ndim] numpy array of training data
@@ -64,6 +65,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.gain_rate = gain_rate
         self.infrate = infrate
         self.learnrate = learnrate
+        self.store_every = store_every
 
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
@@ -91,7 +93,7 @@ class Sparsenet(sparsenet.Sparsenet):
         self.L2acts = np.zeros(nunits)
         self.meanacts = np.zeros_like(self.L0acts)
 
-    def store_stats(self, acts, loss_value, mse_value, meanL1_value):
+    def store_statistics(self, acts, loss_value, mse_value, meanL1_value):
         eta = self.moving_avg_rate
         self.loss_history = np.append(self.loss_history, loss_value)
         self.mse_history = np.append(self.mse_history, mse_value)
@@ -187,9 +189,11 @@ class Sparsenet(sparsenet.Sparsenet):
         with tf.Session(config=self.config, graph=self.graph) as sess:
             self.initialize_vars(sess)
             for tt in range(nbatches):
-                self.store_stats(*self.train_step(sess))
-                if tt % 50 == 0:
-                    print(tt)
+                results = self.train_step(sess)
+                if tt % self.store_every == 0:
+                    self.store_statistics(*results)
+                    if self.store_every > 50 or tt % 50 == 0:
+                        print(tt)
                     self.retrieve_vars(sess)
                     if (tt % 1000 == 0 or tt+1 == nbatches) and tt != 0:
                         try:

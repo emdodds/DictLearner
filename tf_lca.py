@@ -33,7 +33,8 @@ class LCALearner(tf_sparsenet.Sparsenet):
                  learnrate=50.0,
                  snr_goal=None,
                  seek_snr_rate=0.1,
-                 threshfunc='hard'):
+                 threshfunc='hard',
+                 store_every=1):
         """
         Sparse dictionary learner using the
         L1 or L0 locally competitive algorithm
@@ -70,6 +71,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.lam = lam
         self.snr_goal = snr_goal
         self.seek_snr_rate = seek_snr_rate
+        self.store_every = store_every
 
         # initialize model
         self._load_stims(data, datatype, self.stimshape, pca)
