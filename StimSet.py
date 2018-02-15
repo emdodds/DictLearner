@@ -323,7 +323,9 @@ class ToySparseSet(StimSet):
         if white:
             self.whiten()
 
-        self.data /= self.data.std(0, keepdims=True)
+        stddev = self.data.std(0, keepdims=True)
+        self.data /= stddev
+        self.sparsity_parameter = noise**2 / stddev
 
     def test_fit(self, model):
         """Given a model for the sources, calculate a distance metric from
