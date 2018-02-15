@@ -325,7 +325,7 @@ class ToySparseSet(StimSet):
 
         stddev = self.data.std(0, keepdims=True)
         self.data /= stddev
-        self.sparsity_parameter = noise**2 / stddev
+        self.sparsity_parameter = noise**2 / stddev.mean()
 
     def test_fit(self, model):
         """Given a model for the sources, calculate a distance metric from
