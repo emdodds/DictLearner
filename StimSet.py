@@ -330,6 +330,7 @@ class ToySparseSet(StimSet):
         if ksparse is not None:
             ktrues = np.array([True]*ksparse + [False]*(dim - ksparse))
             mask = [np.random.permutation(ktrues) for _ in range(nstims)]
+            mask = np.vstack(mask)
             coefficients[~mask] = 0
         self.data = coefficients.dot(self.sources)
 
