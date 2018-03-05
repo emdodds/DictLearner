@@ -289,7 +289,23 @@ class ToySparseSet(StimSet):
     def __init__(self, dim=200, nsource=None, scale=1,
                  nonneg=False, nstims=300000, rng=None,
                  batch_size=100, white=False, noise=0,
-                 mean_center=True):
+                 mean_center=True, ksparse=None):
+        """
+        Parameters:
+        ----------
+        dim:            (int) dimensionality of data
+        nsource:        (int) number of sources
+        scale:          (float) scale of laplacians,
+                        only relevant relative to noise scale
+        nonneg:         if True, draw from exponential instead of laplace
+        nstims:         (int) number of data to generate
+        rng:            (int) random seed, default 912017
+        batch_size:     (int) default batch size for rand_stim
+        white:          if True, PCA-whiten after generation
+        noise:          (float) scale of gaussian noise
+        mean_center:    if True, center data after generation
+        ksparse:        (int or None) number of sources generating each datum
+        """
         self.stimshape = [dim]
         self.stimsize = dim
         self.nstims = nstims
@@ -311,6 +327,10 @@ class ToySparseSet(StimSet):
         self.nonneg = nonneg
         if self.nonneg:
             coefficients = np.abs(coefficients)
+        if ksparse is not None:
+            ktrues = np.array([True]*ksparse + [False]*(dim - ksparse))
+            mask = [np.random.permutation(ktrues) for _ in range(nstims)]
+            coefficients[~mask] = 0
         self.data = coefficients.dot(self.sources)
 
         if noise > 0:
