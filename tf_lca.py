@@ -166,7 +166,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         self.learn_op = learner.minimize(self.loss,
                                          var_list=[self.phi])
 
-        self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, dim=1))
+        self.renorm_phi = self.phi.assign(tf.nn.l2_normalize(self.phi, axis=1))
 
         self.snr = tf.reduce_mean(tf.square(self.x))/self.mse
         if self.snr_goal is not None:
