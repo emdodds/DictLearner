@@ -36,12 +36,19 @@ def make_fit_learner_class(Learner):
                               ax=None):
             """Plots a moving average of the error and activity history
             with the given averaging window."""
-            window = np.ones(int(window_size))/float(window_size)
+            if window_size == 1:
+                def conv(x):
+                    return x[start:end]
+            else:
+                window = np.ones(int(window_size))/float(window_size)
+
+                def conv(history):
+                    return np.convolve(errorhist[start:end], window, 'valid')
             try:
                 errorhist = self.errorhist
             except:
                 errorhist = self.mse_history
-            smoothederror = np.convolve(errorhist[start:end], window, 'valid')
+            smoothederror = conv(errorhist)
             if norm == 2:
                 acthist = self.L2hist
             elif norm == 0:
@@ -51,8 +58,8 @@ def make_fit_learner_class(Learner):
                     acthist = self.L1hist
                 except:
                     acthist = self.L1_history
-            smoothedactivity = np.convolve(acthist[start:end], window, 'valid')
-            smoothedmodfits = np.convolve(self.modfits[start:end], window, 'valid')
+            smoothedactivity = conv(acthist)
+            smoothedmodfits = conv(self.modfits)
             lines = []
             if ax is None:
                 fig = plt.figure()
@@ -64,7 +71,7 @@ def make_fit_learner_class(Learner):
             labels = ['MSE', 'L1 activity', 'Model recovery']
             try:
                 lam = self.lam
-                loss = smoothederror + lam*smoothedactivity
+                loss = 0.5*smoothederror + lam*smoothedactivity
                 lines =  lines + ax.plot(loss, 'm')
                 labels.append('Sparse coding loss')
             except:
