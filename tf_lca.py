@@ -213,13 +213,15 @@ class LCALearner(tf_sparsenet.Sparsenet):
             nbatches = nexamples/self.batch_size
             if int(nbatches) != nbatches:
                 raise ValueError("Use a multiple of the batch size.")
-            nbatches =  int(nbatches)
+            nbatches = int(nbatches)
             acts = np.zeros((self.nunits, 0))
             for ii in range(nbatches):
                 newx = x[ii*self.batch_size:(ii+1)*self.batch_size]
                 feed_dict = {self.x: newx}
                 newacts = sess.run([self.full_inference], feed_dict=feed_dict)
                 acts = np.concatenate([acts]+newacts, axis=1)
+                if nbatches > 1 and ii % 50 == 0:
+                    print("Completed {} batches of {}".format(ii+1, nbatches))
         return acts
 
     def initialize_vars(self, sess):
