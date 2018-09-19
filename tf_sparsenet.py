@@ -320,3 +320,11 @@ class Sparsenet(sparsenet.Sparsenet):
         self.L1acts = histories['L1acts']
         self.L2acts = histories['L2acts']
         self.meanacts = histories['meanacts']
+
+    @property
+    def errorhist(self):
+        return self.mse_history
+
+    @errorhist.setter
+    def errorhist(self, value):
+        self.mse_history = value

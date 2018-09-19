@@ -210,7 +210,7 @@ class LCALearner(tf_sparsenet.Sparsenet):
         with tf.Session(graph=self.graph, config=self.config) as sess:
             self.initialize_vars(sess)
             nexamples = x.shape[0]
-            nbatches = int(nexamples/self.batch_size)
+            nbatches = int(np.ceil(nexamples/self.batch_size))
             acts = np.zeros((self.nunits, 0))
             for ii in range(nbatches):
                 newx = x[ii*self.batch_size:(ii+1)*self.batch_size]
